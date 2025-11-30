@@ -236,6 +236,28 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function handleDeleteUser(userId: string, userName: string) {
+    if (!confirm(`Are you sure you want to delete "${userName}"? This action cannot be undone.`)) return
+
+    try {
+      const res = await fetch(`/api/users?id=${userId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setUsers(users.filter(u => u.id !== userId))
+        setSuccess('User deleted successfully')
+        setTimeout(() => setSuccess(null), 3000)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to delete user')
+      }
+    } catch (err) {
+      setError('Failed to delete user')
+      console.error(err)
+    }
+  }
+
   function formatDate(date: string) {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -491,7 +513,8 @@ export default function AdminUsersPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Projects</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Joined</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -561,8 +584,25 @@ export default function AdminUsersPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm text-right">
+                    <TableCell className="text-muted-foreground text-sm">
                       {formatDate(user.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteUser(user.id, user.name)}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete user</TooltipContent>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
