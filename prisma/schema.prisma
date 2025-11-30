@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  READY_TO_TEST
+  BLOCKED
+  DONE
+  LIVE
+}
+
+enum NotificationType {
+  MENTION
+  ASSIGNMENT
+}
+
+// Team enum removed - teams are now dynamic per project (stored in ProjectTeam table)
+// Task.team field is now a String that references ProjectTeam.key
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ActivityType {
+  CREATED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  ASSIGNED
+  MOVED_TO_SPRINT
+  SPLIT
+  DESCRIPTION_UPDATED
+  COMMENT_ADDED
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  key         String   @unique // Short key like "HP" for HesabPay
+  logoUrl     String?
+  taskCounter Int      @default(0) // Auto-incrementing counter for task keys
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  sprints        Sprint[]
+  tasks          Task[]
+  folders        Folder[]
+  members        User[]          @relation("ProjectMembers")
+  invites        Invite[]        @relation("InviteProjects")
+  createdBy      User            @relation("CreatedProjects", fields: [createdById], references: [id])
+  createdById    String
+  customStatuses ProjectStatus[]
+  customTeams    ProjectTeam[]
+}
+
+// Custom statuses per project
+model ProjectStatus {
+  id          String  @id @default(cuid())
+  name        String  // Display name like "Ready to Test"
+  key         String  // Internal key like "READY_TO_TEST"
+  color       String  @default("#64748b") // Hex color
+  bgColor     String  @default("#f1f5f9") // Background hex color
+  icon        String? // Optional emoji or icon
+  order       Int     @default(0)
+  isDefault   Boolean @default(false) // Is this a default status that can't be deleted
+  isFinal     Boolean @default(false) // Is this a final/completed status (for metrics)
+  
+  // Relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+
+  @@unique([projectId, key])
+  @@index([projectId])
+}
+
+// Custom teams per project
+model ProjectTeam {
+  id        String  @id @default(cuid())
+  name      String  // Display name like "Operations"
+  key       String  // Internal key like "OPS"
+  color     String  @default("#64748b") // Hex color
+  bgColor   String  @default("#f1f5f9") // Background hex color
+  icon      String? // Optional emoji or icon
+  order     Int     @default(0)
+  isDefault Boolean @default(false) // Is this a default team that can't be deleted
+  
+  // Relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+
+  @@unique([projectId, key])
+  @@index([projectId])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatarUrl String?
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  assignedTasks    Task[]         @relation("AssignedTasks")
+  createdTasks     Task[]         @relation("CreatedTasks")
+  comments         Comment[]
+  attachments      Attachment[]
+  notifications    Notification[]
+  mentionedIn      Comment[]      @relation("Mentions")
+  activities       Activity[]
+  projects         Project[]      @relation("ProjectMembers")
+  createdProjects  Project[]      @relation("CreatedProjects")
+
+  // Spaces relations
+  createdDocuments  Document[]        @relation("CreatedDocuments")
+  documentVersions  DocumentVersion[] @relation("DocumentVersions")
+  documentComments  DocumentComment[] @relation("DocumentComments")
+  
+  // Invites sent by this user
+  sentInvites       Invite[]          @relation("InviteSender")
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  email       String
+  token       String       @unique
+  status      InviteStatus @default(PENDING)
+  expiresAt   DateTime
+  createdAt   DateTime     @default(now())
+  acceptedAt  DateTime?
+
+  // Relations
+  invitedBy   User         @relation("InviteSender", fields: [invitedById], references: [id])
+  invitedById String
+  projects    Project[]    @relation("InviteProjects")
+
+  @@index([email])
+  @@index([token])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+model Sprint {
+  id        String       @id @default(cuid())
+  name      String
+  startDate DateTime?
+  endDate   DateTime?
+  status    SprintStatus @default(PLANNED)
+  order     Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Relations
+  project   Project?     @relation(fields: [projectId], references: [id])
+  projectId String?
+  tasks     Task[]
+
+  @@index([projectId])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  taskKey     String?    @unique // e.g., "BB-001"
+  taskNumber  Int?       // The numeric part of the key
+  title       String
+  description String?    @db.Text
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  order       Int        @default(0)
+  team        String?    // References ProjectTeam.key
+  assignedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  project       Project?       @relation(fields: [projectId], references: [id])
+  projectId     String?
+  sprint        Sprint?        @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  sprintId      String?
+  assignee      User?          @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  assigneeId    String?
+  createdBy     User           @relation("CreatedTasks", fields: [createdById], references: [id])
+  createdById   String
+  splitFrom     Task?          @relation("TaskSplit", fields: [splitFromId], references: [id])
+  splitFromId   String?
+  splitTasks    Task[]         @relation("TaskSplit")
+  comments      Comment[]
+  attachments   Attachment[]
+  notifications Notification[]
+  activities    Activity[]
+  documentLinks TaskDocumentLink[]
+
+  @@index([projectId])
+  @@index([sprintId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([team])
+  @@index([taskKey])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Context - what phase the task was in when comment was made
+  taskStatusAtCreation TaskStatus?
+
+  // Relations
+  task      Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  author    User           @relation(fields: [authorId], references: [id])
+  authorId  String
+  mentions  User[]         @relation("Mentions")
+  notifications Notification[]
+
+  @@index([taskId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  size      Int      // File size in bytes
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  task       Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId     String
+  uploadedBy User   @relation(fields: [uploadedById], references: [id])
+  uploadedById String
+
+  @@index([taskId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId String?
+
+  @@index([userId, read])
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  metadata  Json?        // Store additional context (old/new values, etc.)
+  createdAt DateTime     @default(now())
+
+  // Relations
+  task      Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  user      User         @relation(fields: [userId], references: [id])
+  userId    String
+
+  @@index([taskId])
+}
+
+// ============ SPACES (Documentation) ============
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  documents Document[]
+
+  @@index([projectId])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  title     String
+  content   Json?    // TipTap JSON content
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  folder    Folder            @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folderId  String
+  createdBy User              @relation("CreatedDocuments", fields: [createdById], references: [id])
+  createdById String
+  versions  DocumentVersion[]
+  comments  DocumentComment[]
+  taskLinks TaskDocumentLink[]
+
+  @@index([folderId])
+}
+
+model DocumentVersion {
+  id            String   @id @default(cuid())
+  title         String
+  content       Json?
+  versionNumber Int
+  createdAt     DateTime @default(now())
+
+  // Relations
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+  createdBy  User     @relation("DocumentVersions", fields: [createdById], references: [id])
+  createdById String
+
+  @@index([documentId])
+}
+
+model DocumentComment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+  author    User     @relation("DocumentComments", fields: [authorId], references: [id])
+  authorId  String
+
+  @@index([documentId])
+}
+
+model TaskDocumentLink {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+
+  @@unique([taskId, documentId])
+  @@index([taskId])
+  @@index([documentId])
+}

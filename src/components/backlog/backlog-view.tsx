@@ -1,0 +1,787 @@
+'use client'
+
+import { useState, useCallback, useRef, useEffect } from 'react'
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
+import { Sprint, Task } from '@/types'
+import { SprintSection } from './sprint-section'
+import { BacklogSection } from './backlog-section'
+import { TaskDetailSidebar } from './task-detail-sidebar'
+import { CreateSprintModal } from './create-sprint-modal'
+import { AppLayout } from '@/components/layout/app-layout'
+import { SprintView } from './sprint-view'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+interface BacklogViewProps {
+  initialSprints: Sprint[]
+  initialBacklog: Task[]
+  users: { id: string; name: string; avatarUrl?: string | null }[]
+  currentUser?: { id: string; name: string; role: string }
+  projectId: string
+  onOpenDocument?: (documentId: string) => void
+}
+
+interface PendingMove {
+  task: Task
+  sourceSprintId: string | null
+  sourceSprintName: string
+  sourceSprintStatus: string
+  destSprintId: string | null
+  destSprintName: string
+  newOrder: number
+}
+
+export function BacklogView({ initialSprints, initialBacklog, users, currentUser, projectId, onOpenDocument }: BacklogViewProps) {
+  const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
+  const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [showCreateSprint, setShowCreateSprint] = useState(false)
+  const [viewingSprint, setViewingSprint] = useState<Sprint | null>(null)
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  
+  // Track the original state before drag for reverting
+  const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
+
+  // Sync state when project changes (props update)
+  useEffect(() => {
+    setSprints(initialSprints)
+    setBacklogTasks(initialBacklog)
+    setSelectedTask(null)
+    setViewingSprint(null)
+  }, [projectId, initialSprints, initialBacklog])
+
+  // Categorize sprints
+  const activeSprints = sprints.filter(s => s.status === 'ACTIVE')
+  const plannedSprints = sprints.filter(s => s.status === 'PLANNED')
+  const closedSprints = sprints.filter(s => s.status === 'COMPLETED')
+
+  // Non-closed sprints for drag-drop
+  const visibleSprints = [...activeSprints, ...plannedSprints]
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  )
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event
+    const taskId = active.id as string
+
+    // Save original state for potential revert
+    originalStateRef.current = {
+      sprints: JSON.parse(JSON.stringify(sprints)),
+      backlog: JSON.parse(JSON.stringify(backlogTasks)),
+    }
+
+    // Search in sprints first
+    let task = sprints.flatMap((s) => s.tasks).find((t) => t.id === taskId)
+
+    // If not found, search in backlog
+    if (!task) {
+      task = backlogTasks.find((t) => t.id === taskId)
+    }
+
+    setActiveTask(task || null)
+  }, [sprints, backlogTasks])
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // Find source container (sprint or backlog)
+    let sourceSprintId: string | null = null
+    const sourceSprintIndex = sprints.findIndex((s) => s.tasks.some((t) => t.id === activeId))
+    if (sourceSprintIndex !== -1) {
+      sourceSprintId = sprints[sourceSprintIndex].id
+    }
+    const isFromBacklog = backlogTasks.some((t) => t.id === activeId)
+
+    // Find destination container
+    let destSprintId: string | null = null
+    if (overId === 'backlog-drop-zone') {
+      destSprintId = null // Backlog
+    } else {
+      const destSprint = sprints.find((s) => s.id === overId)
+      if (destSprint) {
+        destSprintId = destSprint.id
+      } else {
+        const destSprintByTask = sprints.find((s) => s.tasks.some((t) => t.id === overId))
+        if (destSprintByTask) {
+          destSprintId = destSprintByTask.id
+        } else if (backlogTasks.some((t) => t.id === overId)) {
+          destSprintId = null // Moving to backlog
+        }
+      }
+    }
+
+    // Same container, no cross-container move needed
+    if ((sourceSprintId === destSprintId) || (isFromBacklog && destSprintId === null)) {
+      return
+    }
+
+    // Cross-container move (visual only, confirmation comes later)
+    if (isFromBacklog && destSprintId) {
+      // Moving from backlog to sprint
+      const task = backlogTasks.find((t) => t.id === activeId)!
+      setBacklogTasks((prev) => prev.filter((t) => t.id !== activeId))
+      setSprints((prev) => prev.map((sprint) =>
+        sprint.id === destSprintId
+          ? { ...sprint, tasks: [...sprint.tasks, { ...task, sprintId: destSprintId }] }
+          : sprint
+      ))
+    } else if (sourceSprintId && destSprintId === null) {
+      // Moving from sprint to backlog
+      const task = sprints[sourceSprintIndex].tasks.find((t) => t.id === activeId)!
+      setSprints((prev) => prev.map((sprint) =>
+        sprint.id === sourceSprintId
+          ? { ...sprint, tasks: sprint.tasks.filter((t) => t.id !== activeId) }
+          : sprint
+      ))
+      setBacklogTasks((prev) => [...prev, { ...task, sprintId: null }])
+    } else if (sourceSprintId && destSprintId && sourceSprintId !== destSprintId) {
+      // Moving between sprints
+      const task = sprints[sourceSprintIndex].tasks.find((t) => t.id === activeId)!
+      setSprints((prev) => prev.map((sprint) => {
+        if (sprint.id === sourceSprintId) {
+          return { ...sprint, tasks: sprint.tasks.filter((t) => t.id !== activeId) }
+        }
+        if (sprint.id === destSprintId) {
+          return { ...sprint, tasks: [...sprint.tasks, { ...task, sprintId: destSprintId }] }
+        }
+        return sprint
+      }))
+    }
+  }, [sprints, backlogTasks])
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveTask(null)
+
+    if (!over) {
+      // Revert if dropped outside
+      if (originalStateRef.current) {
+        setSprints(originalStateRef.current.sprints)
+        setBacklogTasks(originalStateRef.current.backlog)
+        originalStateRef.current = null
+      }
+      return
+    }
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // Find which container the task is in now
+    const sprint = sprints.find((s) => s.tasks.some((t) => t.id === activeId))
+    const isInBacklog = backlogTasks.some((t) => t.id === activeId)
+
+    // Check if this was a cross-container move
+    const original = originalStateRef.current
+    if (original) {
+      const wasInSprint = original.sprints.some(s => s.tasks.some(t => t.id === activeId))
+      const wasInBacklog = original.backlog.some(t => t.id === activeId)
+      
+      const originalSprint = wasInSprint 
+        ? original.sprints.find(s => s.tasks.some(t => t.id === activeId))
+        : null
+      const originalSprintId = originalSprint?.id || null
+      const currentSprintId = sprint?.id || null
+
+      // Cross-container move detected - show confirmation
+      if (originalSprintId !== currentSprintId || (wasInBacklog && sprint) || (wasInSprint && isInBacklog)) {
+        const task = sprint?.tasks.find(t => t.id === activeId) || backlogTasks.find(t => t.id === activeId)
+        if (task) {
+          const sourceSprintName = wasInBacklog ? 'Backlog' : originalSprint?.name || 'Unknown'
+          const sourceSprintStatus = originalSprint?.status || 'PLANNED'
+          const destSprintName = isInBacklog ? 'Backlog' : sprint?.name || 'Unknown'
+          
+          let newOrder = 0
+          if (sprint) {
+            newOrder = sprint.tasks.findIndex(t => t.id === overId)
+            if (newOrder === -1) newOrder = sprint.tasks.length - 1
+          } else if (isInBacklog) {
+            newOrder = backlogTasks.findIndex(t => t.id === overId)
+            if (newOrder === -1) newOrder = backlogTasks.length - 1
+          }
+
+          setPendingMove({
+            task,
+            sourceSprintId: originalSprintId,
+            sourceSprintName,
+            sourceSprintStatus,
+            destSprintId: currentSprintId,
+            destSprintName,
+            newOrder,
+          })
+          return // Wait for confirmation
+        }
+      }
+    }
+
+    // Same container reordering - no confirmation needed
+    if (sprint) {
+      const oldIndex = sprint.tasks.findIndex((t) => t.id === activeId)
+      let newIndex = sprint.tasks.findIndex((t) => t.id === overId)
+
+      if (newIndex === -1) {
+        newIndex = sprint.tasks.length - 1
+      }
+
+      if (oldIndex !== newIndex) {
+        setSprints((prev) => {
+          const sprintIdx = prev.findIndex((s) => s.id === sprint.id)
+          const newTasks = arrayMove(prev[sprintIdx].tasks, oldIndex, newIndex)
+          const newSprints = [...prev]
+          newSprints[sprintIdx] = { ...newSprints[sprintIdx], tasks: newTasks }
+          return newSprints
+        })
+      }
+
+      // Persist to server
+      try {
+        await fetch('/api/tasks/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: activeId,
+            targetSprintId: sprint.id,
+            newOrder: newIndex,
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to reorder task:', error)
+      }
+    } else if (isInBacklog) {
+      const oldIndex = backlogTasks.findIndex((t) => t.id === activeId)
+      let newIndex = backlogTasks.findIndex((t) => t.id === overId)
+
+      if (newIndex === -1) {
+        newIndex = backlogTasks.length - 1
+      }
+
+      if (oldIndex !== newIndex) {
+        setBacklogTasks((prev) => arrayMove(prev, oldIndex, newIndex))
+      }
+
+      // Persist to server
+      try {
+        await fetch('/api/tasks/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: activeId,
+            targetSprintId: null,
+            newOrder: newIndex,
+          }),
+        })
+      } catch (error) {
+        console.error('Failed to reorder task:', error)
+      }
+    }
+
+    originalStateRef.current = null
+  }, [sprints, backlogTasks])
+
+  const confirmMove = useCallback(async () => {
+    if (!pendingMove) return
+
+    // Persist to server
+    try {
+      await fetch('/api/tasks/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: pendingMove.task.id,
+          targetSprintId: pendingMove.destSprintId,
+          newOrder: pendingMove.newOrder,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to move task:', error)
+      // Revert on error
+      if (originalStateRef.current) {
+        setSprints(originalStateRef.current.sprints)
+        setBacklogTasks(originalStateRef.current.backlog)
+      }
+    }
+
+    originalStateRef.current = null
+    setPendingMove(null)
+  }, [pendingMove])
+
+  const confirmSplit = useCallback(async () => {
+    if (!pendingMove) return
+
+    try {
+      // Split the task - creates a new task in the destination, keeps original in source
+      const res = await fetch(`/api/tasks/${pendingMove.task.id}/split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetSprintId: pendingMove.destSprintId,
+        }),
+      })
+      
+      if (res.ok) {
+        const newTask = await res.json()
+        
+        // Revert the visual move (task stays in original sprint)
+        if (originalStateRef.current) {
+          setSprints(originalStateRef.current.sprints)
+          setBacklogTasks(originalStateRef.current.backlog)
+        }
+        
+        // Add the new split task to the destination
+        if (newTask.sprintId) {
+          setSprints(prev => prev.map(sprint => {
+            // Update the original task to show it has split tasks
+            if (sprint.id === pendingMove.sourceSprintId) {
+              return {
+                ...sprint,
+                tasks: sprint.tasks.map(t => 
+                  t.id === pendingMove.task.id 
+                    ? { ...t, splitTasks: [...(t.splitTasks || []), { id: newTask.id, title: newTask.title, status: newTask.status, createdAt: newTask.createdAt }] }
+                    : t
+                )
+              }
+            }
+            // Add the new task to destination sprint
+            if (sprint.id === newTask.sprintId) {
+              return { ...sprint, tasks: [...sprint.tasks, newTask] }
+            }
+            return sprint
+          }))
+        } else {
+          // Update original task
+          setSprints(prev => prev.map(sprint => {
+            if (sprint.id === pendingMove.sourceSprintId) {
+              return {
+                ...sprint,
+                tasks: sprint.tasks.map(t => 
+                  t.id === pendingMove.task.id 
+                    ? { ...t, splitTasks: [...(t.splitTasks || []), { id: newTask.id, title: newTask.title, status: newTask.status, createdAt: newTask.createdAt }] }
+                    : t
+                )
+              }
+            }
+            return sprint
+          }))
+          setBacklogTasks(prev => [...prev, newTask])
+        }
+      }
+    } catch (error) {
+      console.error('Failed to split task:', error)
+      // Revert on error
+      if (originalStateRef.current) {
+        setSprints(originalStateRef.current.sprints)
+        setBacklogTasks(originalStateRef.current.backlog)
+      }
+    }
+
+    originalStateRef.current = null
+    setPendingMove(null)
+  }, [pendingMove])
+
+  const cancelMove = useCallback(() => {
+    // Revert to original state
+    if (originalStateRef.current) {
+      setSprints(originalStateRef.current.sprints)
+      setBacklogTasks(originalStateRef.current.backlog)
+      originalStateRef.current = null
+    }
+    setPendingMove(null)
+  }, [])
+
+  const handleTaskClick = useCallback((task: Task) => {
+    setSelectedTask(task)
+  }, [])
+
+  const handleTaskUpdate = useCallback((updatedTask: Task) => {
+    // Check if sprint changed
+    const wasInSprint = sprints.some(s => s.tasks.some(t => t.id === updatedTask.id))
+    const wasInBacklog = backlogTasks.some(t => t.id === updatedTask.id)
+
+    if (updatedTask.sprintId) {
+      // Task should be in a sprint
+      if (wasInBacklog) {
+        // Move from backlog to sprint
+        setBacklogTasks(prev => prev.filter(t => t.id !== updatedTask.id))
+        setSprints(prev => prev.map(sprint =>
+          sprint.id === updatedTask.sprintId
+            ? { ...sprint, tasks: [...sprint.tasks, updatedTask] }
+            : sprint
+        ))
+      } else {
+        // Update in sprints (possibly move between sprints)
+        setSprints(prev => {
+          const oldSprint = prev.find(s => s.tasks.some(t => t.id === updatedTask.id))
+          if (oldSprint && oldSprint.id !== updatedTask.sprintId) {
+            // Move between sprints
+            return prev.map(sprint => {
+              if (sprint.id === oldSprint.id) {
+                return { ...sprint, tasks: sprint.tasks.filter(t => t.id !== updatedTask.id) }
+              }
+              if (sprint.id === updatedTask.sprintId) {
+                return { ...sprint, tasks: [...sprint.tasks, updatedTask] }
+              }
+              return sprint
+            })
+          }
+          // Update in place
+          return prev.map(sprint => ({
+            ...sprint,
+            tasks: sprint.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
+          }))
+        })
+      }
+    } else {
+      // Task should be in backlog
+      if (wasInSprint) {
+        // Move from sprint to backlog
+        setSprints(prev => prev.map(sprint => ({
+          ...sprint,
+          tasks: sprint.tasks.filter(t => t.id !== updatedTask.id),
+        })))
+        setBacklogTasks(prev => [...prev, updatedTask])
+      } else {
+        // Update in backlog
+        setBacklogTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t))
+      }
+    }
+    setSelectedTask(updatedTask)
+  }, [sprints, backlogTasks])
+
+  const handleTaskDelete = useCallback((taskId: string) => {
+    setSprints(prev => prev.map(sprint => ({
+      ...sprint,
+      tasks: sprint.tasks.filter(t => t.id !== taskId),
+    })))
+    setBacklogTasks(prev => prev.filter(t => t.id !== taskId))
+    setSelectedTask(null)
+  }, [])
+
+  const handleTaskSplit = useCallback((newTask: Task) => {
+    if (newTask.sprintId) {
+      setSprints(prev => prev.map(sprint =>
+        sprint.id === newTask.sprintId
+          ? { ...sprint, tasks: [...sprint.tasks, newTask].sort((a, b) => a.order - b.order) }
+          : sprint
+      ))
+    } else {
+      setBacklogTasks(prev => [...prev, newTask])
+    }
+  }, [])
+
+  const handleCreateTask = useCallback((newTask: Task) => {
+    if (newTask.sprintId) {
+      setSprints(prev => prev.map(sprint =>
+        sprint.id === newTask.sprintId
+          ? { ...sprint, tasks: [...sprint.tasks, newTask] }
+          : sprint
+      ))
+    } else {
+      setBacklogTasks(prev => [...prev, newTask])
+    }
+  }, [])
+
+  const handleCreateSprint = useCallback((newSprint: Sprint) => {
+    setSprints(prev => [...prev, newSprint])
+    setShowCreateSprint(false)
+  }, [])
+
+  const handleSprintStatusChange = useCallback((sprintId: string, newStatus: string) => {
+    setSprints(prev => prev.map(sprint =>
+      sprint.id === sprintId ? { ...sprint, status: newStatus as any } : sprint
+    ))
+  }, [])
+
+  const handleSprintUpdate = useCallback((updatedSprint: Sprint) => {
+    setSprints(prev => prev.map(sprint =>
+      sprint.id === updatedSprint.id ? { ...sprint, ...updatedSprint } : sprint
+    ))
+  }, [])
+
+  const totalTasks = visibleSprints.reduce((acc, s) => acc + s.tasks.length, 0) + backlogTasks.length
+
+  // Check if dragging from active sprint
+  const isFromActiveSprint = pendingMove?.sourceSprintStatus === 'ACTIVE'
+
+  // Keep viewingSprint in sync with sprints state
+  const currentViewingSprint = viewingSprint 
+    ? sprints.find(s => s.id === viewingSprint.id) || viewingSprint 
+    : null
+
+  return (
+    <AppLayout
+      activeSprint={activeSprints[0] || null}
+      completedSprints={closedSprints}
+      selectedSprint={viewingSprint}
+      onSprintSelect={setViewingSprint}
+    >
+      <div className="flex h-full">
+        {/* Main content area */}
+        <div className="flex-1 min-w-0 h-full">
+          {/* Show sprint view or main backlog */}
+          {currentViewingSprint ? (
+            <SprintView
+              sprint={currentViewingSprint}
+              users={users}
+              allSprints={sprints}
+              currentUser={currentUser}
+              projectId={projectId}
+              onBack={() => setViewingSprint(null)}
+              onTaskUpdate={handleTaskUpdate}
+              onTaskCreate={handleCreateTask}
+              onTaskDelete={handleTaskDelete}
+              onOpenDocument={onOpenDocument}
+            />
+          ) : (
+          <ScrollArea className="h-full">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold">Backlog</h1>
+              <p className="text-sm text-muted-foreground">
+                {totalTasks} tasks across {visibleSprints.length} sprints + backlog
+              </p>
+            </div>
+            <Button onClick={() => setShowCreateSprint(true)}>
+              + New Sprint
+            </Button>
+          </div>
+
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            {/* Active Sprints */}
+            {activeSprints.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Active Sprint
+                  </h2>
+                  <Badge variant="default" className="bg-green-500">
+                    {activeSprints.length}
+                  </Badge>
+                </div>
+                {activeSprints.map((sprint) => (
+                  <SprintSection
+                    key={sprint.id}
+                    sprint={sprint}
+                    users={users}
+                    availableSprints={plannedSprints}
+                    projectId={projectId}
+                    onTaskClick={handleTaskClick}
+                    onCreateTask={handleCreateTask}
+                    onTaskUpdate={handleTaskUpdate}
+                    onStatusChange={handleSprintStatusChange}
+                    onSprintUpdate={handleSprintUpdate}
+                    onSprintComplete={(completedSprint) => {
+                      setSprints(prev => prev.map(s => 
+                        s.id === completedSprint.id ? completedSprint : s
+                      ))
+                    }}
+                    onOpenInDedicatedView={setViewingSprint}
+                    variant="active"
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Planned/Future Sprints */}
+            {plannedSprints.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Upcoming Sprints
+                  </h2>
+                  <Badge variant="secondary">
+                    {plannedSprints.length}
+                  </Badge>
+                </div>
+                {plannedSprints.map((sprint) => (
+                  <SprintSection
+                    key={sprint.id}
+                    sprint={sprint}
+                    users={users}
+                    availableSprints={plannedSprints.filter(s => s.id !== sprint.id)}
+                    projectId={projectId}
+                    onTaskClick={handleTaskClick}
+                    onCreateTask={handleCreateTask}
+                    onTaskUpdate={handleTaskUpdate}
+                    onStatusChange={handleSprintStatusChange}
+                    onSprintUpdate={handleSprintUpdate}
+                    onOpenInDedicatedView={setViewingSprint}
+                    variant="planned"
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Backlog Section */}
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Backlog
+                </h2>
+                <Badge variant="outline">
+                  {backlogTasks.length}
+                </Badge>
+              </div>
+              <BacklogSection
+                tasks={backlogTasks}
+                users={users}
+                projectId={projectId}
+                onTaskClick={handleTaskClick}
+                onCreateTask={handleCreateTask}
+                onTaskUpdate={handleTaskUpdate}
+              />
+            </div>
+
+            {/* Empty State */}
+            {visibleSprints.length === 0 && backlogTasks.length === 0 && (
+              <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                <p className="text-muted-foreground mb-4">
+                  No sprints or tasks yet. Create your first sprint or add tasks to the backlog.
+                </p>
+                <Button onClick={() => setShowCreateSprint(true)}>
+                  Create Sprint
+                </Button>
+              </div>
+            )}
+
+            <DragOverlay>
+              {activeTask && (
+                <div className="bg-background shadow-lg rounded-md border px-3 py-1.5 text-sm">
+                  {activeTask.title}
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </div>
+      </ScrollArea>
+          )}
+        </div>
+
+        {/* Move/Split confirmation dialog */}
+      <Dialog open={!!pendingMove} onOpenChange={() => cancelMove()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isFromActiveSprint ? 'Move or Split Task?' : 'Move Task'}
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              {isFromActiveSprint ? (
+                <p>This task is from an <strong>active sprint</strong>. Would you like to move it completely or split it to continue in the next sprint?</p>
+              ) : (
+                <p>Are you sure you want to move this task?</p>
+              )}
+              <div className="bg-muted p-3 rounded-md mt-2">
+                <p className="font-medium text-foreground">{pendingMove?.task.title}</p>
+              </div>
+              <div className="flex items-center gap-2 text-sm mt-3">
+                <span className="text-muted-foreground">From:</span>
+                <Badge variant={isFromActiveSprint ? "default" : "outline"} className={isFromActiveSprint ? "bg-green-500" : ""}>
+                  {pendingMove?.sourceSprintName}
+                </Badge>
+                <span className="text-muted-foreground">→</span>
+                <span className="text-muted-foreground">To:</span>
+                <Badge variant="secondary">{pendingMove?.destSprintName}</Badge>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={cancelMove}>
+              Cancel
+            </Button>
+            {isFromActiveSprint && (
+              <Button variant="secondary" onClick={confirmSplit}>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                Split Task
+              </Button>
+            )}
+            <Button onClick={confirmMove}>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+              Move Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+        {/* Task detail sidebar - inline next to content */}
+        {selectedTask && (
+          <TaskDetailSidebar
+            task={selectedTask}
+            users={users}
+            sprints={sprints}
+            currentUserId={currentUser?.id}
+            currentUserRole={currentUser?.role}
+            projectId={projectId}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={handleTaskUpdate}
+            onDelete={handleTaskDelete}
+            onSplit={handleTaskSplit}
+            onTaskSelect={async (taskId) => {
+              // Fetch the task and select it
+              try {
+                const res = await fetch(`/api/tasks/${taskId}`)
+                if (res.ok) {
+                  const task = await res.json()
+                  setSelectedTask(task)
+                }
+              } catch (error) {
+                console.error('Failed to fetch task:', error)
+              }
+            }}
+            onOpenDocument={onOpenDocument}
+          />
+        )}
+      </div>
+
+      {/* Create sprint modal */}
+      {showCreateSprint && (
+        <CreateSprintModal
+          projectId={projectId}
+          existingSprintsCount={sprints.length}
+          onClose={() => setShowCreateSprint(false)}
+          onCreate={handleCreateSprint}
+        />
+      )}
+    </AppLayout>
+  )
+}

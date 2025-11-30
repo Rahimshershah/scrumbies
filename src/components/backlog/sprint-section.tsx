@@ -1,0 +1,315 @@
+'use client'
+
+import { useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { Sprint, Task } from '@/types'
+import { TaskCard } from './task-card'
+import { InlineTaskInput } from './inline-task-input'
+import { EditSprintModal } from './edit-sprint-modal'
+import { CompleteSprintModal } from './complete-sprint-modal'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
+
+interface SprintSectionProps {
+  sprint: Sprint
+  users: { id: string; name: string; avatarUrl?: string | null }[]
+  availableSprints?: Sprint[] // For complete modal - planned sprints
+  projectId?: string
+  onTaskClick: (task: Task) => void
+  onCreateTask: (task: Task) => void
+  onTaskUpdate?: (task: Task) => void
+  onStatusChange?: (sprintId: string, status: string) => void
+  onSprintUpdate?: (sprint: Sprint) => void
+  onSprintComplete?: (completedSprint: Sprint, newTasks?: Task[]) => void
+  onOpenInDedicatedView?: (sprint: Sprint) => void
+  variant?: 'active' | 'planned'
+}
+
+function formatDate(dateString: string | null | undefined) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+}
+
+export function SprintSection({
+  sprint,
+  users,
+  availableSprints = [],
+  projectId,
+  onTaskClick,
+  onCreateTask,
+  onTaskUpdate,
+  onStatusChange,
+  onSprintUpdate,
+  onSprintComplete,
+  onOpenInDedicatedView,
+  variant = 'planned'
+}: SprintSectionProps) {
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+
+  const { setNodeRef, isOver } = useDroppable({
+    id: sprint.id,
+  })
+
+  const taskCount = sprint.tasks.length
+  const taskIds = sprint.tasks.map((t) => t.id)
+  const openTasksCount = sprint.tasks.filter(t => t.status !== 'DONE').length
+  
+  // Count tasks with splits (tasks that have been split into others)
+  const splitTasksCount = sprint.tasks.filter(t => t.splitTasks && t.splitTasks.length > 0).length
+  // Count tasks that are split from others
+  const splitFromCount = sprint.tasks.filter(t => t.splitFrom).length
+
+  async function handleStatusChange(newStatus: string) {
+    try {
+      await fetch(`/api/sprints/${sprint.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      onStatusChange?.(sprint.id, newStatus)
+    } catch (error) {
+      console.error('Failed to update sprint status:', error)
+    }
+  }
+
+  function handleCompleteClick() {
+    if (openTasksCount > 0) {
+      // Show modal to choose what to do with open tasks
+      setShowCompleteModal(true)
+    } else {
+      // No open tasks, just complete
+      handleStatusChange('COMPLETED')
+    }
+  }
+
+  function handleSprintCompleted(completedSprint: Sprint, action: string, targetSprintId?: string) {
+    onSprintComplete?.(completedSprint)
+    onStatusChange?.(sprint.id, 'COMPLETED')
+  }
+
+  const handleCreateTask = (task: Task) => {
+    onCreateTask(task)
+    setIsAddingTask(false)
+  }
+
+  const handleSprintUpdate = (updatedSprint: Sprint) => {
+    onSprintUpdate?.(updatedSprint)
+    setIsEditing(false)
+  }
+
+  return (
+    <div className="mb-3">
+      {/* Sprint header */}
+      <div className={cn(
+        "flex items-center gap-3 px-3 py-1.5 rounded-t-md border cursor-pointer bg-muted/50"
+      )}
+      onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <svg
+          className={cn(
+            "w-3.5 h-3.5 text-muted-foreground transition-transform flex-shrink-0",
+            isCollapsed && "-rotate-90"
+          )}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+
+        {/* Sprint name */}
+        <h3 className="font-medium text-sm">{sprint.name}</h3>
+
+        {/* Active badge */}
+        {variant === 'active' && (
+          <Badge className="bg-green-500 hover:bg-green-500 text-white text-[10px] h-5 px-2">
+            Active
+          </Badge>
+        )}
+
+        {/* Date range */}
+        {(sprint.startDate || sprint.endDate) && (
+          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
+          </span>
+        )}
+
+        {/* Task count badge */}
+        <Badge variant="outline" className="text-[10px] h-5 px-2 gap-1">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
+        </Badge>
+
+        {/* Split indicator - shows if there are split tasks in this sprint */}
+        {(splitTasksCount > 0 || splitFromCount > 0) && (
+          <Badge variant="secondary" className="text-[10px] h-5 px-2 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            {splitTasksCount > 0 && `${splitTasksCount} split`}
+            {splitTasksCount > 0 && splitFromCount > 0 && ' · '}
+            {splitFromCount > 0 && `${splitFromCount} cont.`}
+          </Badge>
+        )}
+
+        <div className="ml-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          {/* Eye icon for dedicated view */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-6 w-6 p-0"
+            onClick={() => onOpenInDedicatedView?.(sprint)}
+            title="Open full view"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Sprint
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onOpenInDedicatedView?.(sprint)}>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Open Full View
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {sprint.status !== 'ACTIVE' && (
+                <DropdownMenuItem onClick={() => handleStatusChange('ACTIVE')}>
+                  Start Sprint
+                </DropdownMenuItem>
+              )}
+              {sprint.status === 'ACTIVE' && (
+                <DropdownMenuItem onClick={handleCompleteClick}>
+                  Complete Sprint
+                  {openTasksCount > 0 && (
+                    <span className="ml-2 text-[10px] text-amber-600 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded">
+                      {openTasksCount} open
+                    </span>
+                  )}
+                </DropdownMenuItem>
+              )}
+              {sprint.status !== 'PLANNED' && sprint.status !== 'COMPLETED' && (
+                <DropdownMenuItem onClick={() => handleStatusChange('PLANNED')}>
+                  Move to Planned
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive">
+                Delete Sprint
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={() => setIsAddingTask(true)}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </Button>
+        </div>
+      </div>
+
+      {/* Tasks */}
+      {!isCollapsed && (
+        <div
+          ref={setNodeRef}
+          className={cn(
+            "border border-t-0 rounded-b-md transition-colors",
+            isOver ? "bg-accent" : "bg-card",
+            sprint.tasks.length === 0 && !isAddingTask && "min-h-[40px]"
+          )}
+        >
+          <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+            {sprint.tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                users={users}
+                onClick={() => onTaskClick(task)}
+                onUpdate={onTaskUpdate}
+              />
+            ))}
+          </SortableContext>
+
+          {/* Inline task creation */}
+          {isAddingTask && (
+            <div className="px-2 py-1.5">
+              <InlineTaskInput
+                sprintId={sprint.id}
+                projectId={projectId}
+                users={users}
+                onSave={handleCreateTask}
+                onCancel={() => setIsAddingTask(false)}
+              />
+            </div>
+          )}
+
+          {sprint.tasks.length === 0 && !isAddingTask && (
+            <div className="px-3 py-2 text-xs text-muted-foreground text-center">
+              No tasks. Drag here or click +
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Edit Sprint Modal */}
+      {isEditing && (
+        <EditSprintModal
+          sprint={sprint}
+          onClose={() => setIsEditing(false)}
+          onUpdate={handleSprintUpdate}
+        />
+      )}
+
+      {/* Complete Sprint Modal */}
+      {showCompleteModal && (
+        <CompleteSprintModal
+          sprint={sprint}
+          availableSprints={availableSprints}
+          onClose={() => setShowCompleteModal(false)}
+          onComplete={handleSprintCompleted}
+        />
+      )}
+    </div>
+  )
+}

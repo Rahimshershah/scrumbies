@@ -1,0 +1,5 @@
+export { SpacesView } from './spaces-view'
+export { FolderTree } from './folder-tree'
+export { DocumentEditor } from './document-editor'
+export { VersionHistory } from './version-history'
+export { DocumentComments } from './document-comments'
