@@ -279,6 +279,12 @@ We believe in AI-augmented development, and Scrumbies is proof that you can buil
 ### Team Collaboration
 ![Collaboration](docs/screenshots/4.png)
 
+### Admin & Settings
+![Settings](docs/screenshots/5.png)
+
+### User Management
+![Users](docs/screenshots/6.png)
+
 </details>
 
 ---
