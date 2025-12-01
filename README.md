@@ -273,17 +273,17 @@ We believe in AI-augmented development, and Scrumbies is proof that you can buil
 ### Task Details
 ![Task Details](docs/screenshots/2.png)
 
-### Documentation Spaces
-![Spaces](docs/screenshots/3.png)
+### Linking Documents to Tasks
+![Linking Documents](docs/screenshots/3.png)
 
-### Team Collaboration
-![Collaboration](docs/screenshots/4.png)
+### Splitting Tasks
+![Splitting Tasks](docs/screenshots/4.png)
 
-### Admin & Settings
-![Settings](docs/screenshots/5.png)
+### Documents Management (Spaces)
+![Spaces](docs/screenshots/5.png)
 
-### User Management
-![Users](docs/screenshots/6.png)
+### Create Folders in Spaces
+![Folders](docs/screenshots/6.png)
 
 </details>
 
