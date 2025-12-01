@@ -267,23 +267,20 @@ We believe in AI-augmented development, and Scrumbies is proof that you can buil
 <details>
 <summary>Click to see screenshots</summary>
 
-### Sprint Board & Backlog
-![Sprint Board](docs/screenshots/1.png)
-
-### Task Details
-![Task Details](docs/screenshots/2.png)
+### Sprint Board with Task Details
+![Sprint Board](docs/screenshots/1.jpg)
 
 ### Linking Documents to Tasks
-![Linking Documents](docs/screenshots/3.png)
+![Linking Documents](docs/screenshots/2.jpg)
 
 ### Splitting Tasks
-![Splitting Tasks](docs/screenshots/4.png)
+![Splitting Tasks](docs/screenshots/3.png)
 
 ### Documents Management (Spaces)
-![Spaces](docs/screenshots/5.png)
+![Spaces](docs/screenshots/4.jpg)
 
-### Create Folders in Spaces
-![Folders](docs/screenshots/6.png)
+### Creating Folders in Spaces
+![Folders](docs/screenshots/5.jpg)
 
 </details>
 
