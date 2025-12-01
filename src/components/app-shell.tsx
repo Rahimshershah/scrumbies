@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { BacklogView } from '@/components/backlog/backlog-view'
 import { SpacesView } from '@/components/spaces'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
+import { RowHeightProvider } from '@/contexts/row-height-context'
 import { Project, Sprint, Task } from '@/types'
 
 export type AppView = 'backlog' | 'spaces'
@@ -33,17 +35,20 @@ export function AppShell({
   initialSprints,
   initialBacklog,
   users: initialUsers,
-  unreadCount,
+  unreadCount: initialUnreadCount,
 }: AppShellProps) {
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [user, setUser] = useState(initialUser)
   const [users, setUsers] = useState(initialUsers)
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId)
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [currentView, setCurrentView] = useState<AppView>('backlog')
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null)
+  const [taskToOpen, setTaskToOpen] = useState<string | null>(null)
 
   // Restore view from localStorage on mount
   useEffect(() => {
@@ -58,6 +63,19 @@ export function AppShell({
     setCurrentView(view)
     localStorage.setItem('scrumbies_current_view', view)
   }, [])
+
+  // Check for task query parameter on mount
+  useEffect(() => {
+    const taskParam = searchParams?.get('task')
+    if (taskParam) {
+      setTaskToOpen(taskParam)
+      handleViewChange('backlog')
+      // Clear the URL parameter after reading it
+      window.history.replaceState({}, '', window.location.pathname)
+      // Clear taskToOpen after processing
+      setTimeout(() => setTaskToOpen(null), 100)
+    }
+  }, [searchParams, handleViewChange])
 
   // Handle opening a document from task sidebar
   const handleOpenDocument = useCallback((documentId: string) => {
@@ -126,6 +144,35 @@ export function AppShell({
     handleProjectChange(newProject.id)
   }, [handleProjectChange])
 
+  // Handle task selection from notifications
+  const handleTaskSelect = useCallback((taskId: string) => {
+    setTaskToOpen(taskId)
+    handleViewChange('backlog')
+    // Clear after a short delay to allow BacklogView to process it
+    setTimeout(() => setTaskToOpen(null), 100)
+  }, [handleViewChange])
+
+  // Refresh unread count
+  const handleUnreadCountChange = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications')
+      if (res.ok) {
+        const notifications = await res.json()
+        const unread = notifications.filter((n: { read: boolean }) => !n.read).length
+        setUnreadCount(unread)
+      }
+    } catch (error) {
+      console.error('Failed to refresh unread count:', error)
+    }
+  }, [])
+
+  // Refresh unread count on mount and periodically
+  useEffect(() => {
+    handleUnreadCountChange()
+    const interval = setInterval(handleUnreadCountChange, 30000) // Refresh every 30 seconds
+    return () => clearInterval(interval)
+  }, [handleUnreadCountChange])
+
   // If no projects, show create project screen
   if (projects.length === 0) {
     return (
@@ -139,6 +186,8 @@ export function AppShell({
           onUserUpdate={handleUserUpdate}
           currentView={currentView}
           onViewChange={handleViewChange}
+          onTaskSelect={handleTaskSelect}
+          onUnreadCountChange={handleUnreadCountChange}
         />
         <div className="flex-1">
           <ProjectRequired user={user} />
@@ -151,7 +200,8 @@ export function AppShell({
 
   return (
     <ProjectSettingsProvider projectId={effectiveProjectId}>
-      <div className="min-h-screen bg-background flex flex-col">
+      <RowHeightProvider>
+        <div className="min-h-screen bg-background flex flex-col">
         <Header
           user={user}
           unreadCount={unreadCount}
@@ -161,6 +211,8 @@ export function AppShell({
           onUserUpdate={handleUserUpdate}
           currentView={currentView}
           onViewChange={handleViewChange}
+          onTaskSelect={handleTaskSelect}
+          onUnreadCountChange={handleUnreadCountChange}
         />
         <div className="flex-1 relative overflow-hidden">
           {loading && (
@@ -181,6 +233,7 @@ export function AppShell({
             currentUser={user}
             projectId={effectiveProjectId}
             onOpenDocument={handleOpenDocument}
+            taskToOpen={taskToOpen}
           />
         ) : (
           <SpacesView
@@ -192,6 +245,7 @@ export function AppShell({
           )}
         </div>
       </div>
+      </RowHeightProvider>
     </ProjectSettingsProvider>
   )
 }

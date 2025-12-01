@@ -21,6 +21,7 @@ import { TaskDetailSidebar } from './task-detail-sidebar'
 import { InlineTaskInput } from './inline-task-input'
 import { cn } from '@/lib/utils'
 import { useProjectSettings } from '@/contexts/project-settings-context'
+import { useRowHeight } from '@/contexts/row-height-context'
 
 interface SprintViewProps {
   sprint: Sprint
@@ -60,6 +61,7 @@ function SortableTaskRow({
   canEdit: boolean
 }) {
   const { getStatusConfig, getTeamConfig } = useProjectSettings()
+  const { getRowHeightClass } = useRowHeight()
   const {
     attributes,
     listeners,
@@ -94,7 +96,8 @@ function SortableTaskRow({
       style={style}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-4 px-3 py-2 border-b last:border-b-0 hover:bg-accent/50 cursor-pointer transition-colors",
+        "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 cursor-pointer transition-colors",
+        getRowHeightClass(),
         isDragging && "opacity-50 bg-background shadow-lg"
       )}
     >

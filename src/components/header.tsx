@@ -38,9 +38,11 @@ interface HeaderProps {
   onUserUpdate?: (user: { name: string; email: string; avatarUrl?: string | null }) => void
   currentView?: AppView
   onViewChange?: (view: AppView) => void
+  onTaskSelect?: (taskId: string) => void
+  onUnreadCountChange?: () => void
 }
 
-export function Header({ user, unreadCount, projects: initialProjects, currentProjectId, onProjectChange, onUserUpdate, currentView = 'backlog', onViewChange }: HeaderProps) {
+export function Header({ user, unreadCount, projects: initialProjects, currentProjectId, onProjectChange, onUserUpdate, currentView = 'backlog', onViewChange, onTaskSelect, onUnreadCountChange }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [projects, setProjects] = useState<Project[]>(initialProjects || [])
   const currentProject = projects.find(p => p.id === currentProjectId) || projects[0] || null
@@ -367,7 +369,24 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={async () => {
+                  const wasOpen = showNotifications
+                  setShowNotifications(!showNotifications)
+                  
+                  // If opening the panel and there are unread notifications, mark all as read
+                  if (!wasOpen && unreadCount > 0) {
+                    try {
+                      await fetch('/api/notifications', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ markAllRead: true }),
+                      })
+                      onUnreadCountChange?.()
+                    } catch (error) {
+                      console.error('Failed to mark notifications as read:', error)
+                    }
+                  }
+                }}
                 className="relative"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -381,7 +400,11 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
               </Button>
 
               {showNotifications && (
-                <NotificationPanel onClose={() => setShowNotifications(false)} />
+                <NotificationPanel 
+                  onClose={() => setShowNotifications(false)} 
+                  onTaskSelect={onTaskSelect}
+                  onMarkAllRead={onUnreadCountChange}
+                />
               )}
             </div>
 

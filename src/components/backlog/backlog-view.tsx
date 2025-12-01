@@ -23,6 +23,7 @@ import { SprintView } from './sprint-view'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import { useRowHeight } from '@/contexts/row-height-context'
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ interface BacklogViewProps {
   currentUser?: { id: string; name: string; role: string }
   projectId: string
   onOpenDocument?: (documentId: string) => void
+  taskToOpen?: string | null
 }
 
 interface PendingMove {
@@ -51,7 +53,8 @@ interface PendingMove {
   newOrder: number
 }
 
-export function BacklogView({ initialSprints, initialBacklog, users, currentUser, projectId, onOpenDocument }: BacklogViewProps) {
+export function BacklogView({ initialSprints, initialBacklog, users, currentUser, projectId, onOpenDocument, taskToOpen }: BacklogViewProps) {
+  const { rowHeight, setRowHeight } = useRowHeight()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -59,9 +62,38 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
   const [showCreateSprint, setShowCreateSprint] = useState(false)
   const [viewingSprint, setViewingSprint] = useState<Sprint | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
+  const [lastOpenedTaskId, setLastOpenedTaskId] = useState<string | null>(null)
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
+
+  // Handle external task selection request
+  useEffect(() => {
+    if (taskToOpen && taskToOpen !== lastOpenedTaskId) {
+      setLastOpenedTaskId(taskToOpen)
+      async function openTask() {
+        try {
+          const res = await fetch(`/api/tasks/${taskToOpen}`)
+          if (res.ok) {
+            const task = await res.json()
+            setSelectedTask(task)
+            // If task is in a sprint, open that sprint view
+            if (task.sprintId) {
+              const sprint = sprints.find(s => s.id === task.sprintId)
+              if (sprint) {
+                setViewingSprint(sprint)
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch task:', error)
+        }
+      }
+      openTask()
+      // Clear taskToOpen after processing (via parent callback if available, or just track it)
+      // The parent will clear it when taskToOpen changes
+    }
+  }, [taskToOpen, lastOpenedTaskId, sprints])
 
   // Sync state when project changes (props update)
   useEffect(() => {
@@ -69,6 +101,7 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
     setBacklogTasks(initialBacklog)
     setSelectedTask(null)
     setViewingSprint(null)
+    setLastOpenedTaskId(null)
   }, [projectId, initialSprints, initialBacklog])
 
   // Categorize sprints
@@ -591,16 +624,51 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
           <ScrollArea className="h-full">
         <div className="p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">Backlog</h1>
-              <p className="text-sm text-muted-foreground">
-                {totalTasks} tasks across {visibleSprints.length} sprints + backlog
-              </p>
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h1 className="text-2xl font-bold">Backlog</h1>
+                <p className="text-sm text-muted-foreground">
+                  {totalTasks} tasks across {visibleSprints.length} sprints + backlog
+                </p>
+              </div>
+              <Button onClick={() => setShowCreateSprint(true)}>
+                + New Sprint
+              </Button>
             </div>
-            <Button onClick={() => setShowCreateSprint(true)}>
-              + New Sprint
-            </Button>
+            {/* Row Height Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Row height:</span>
+              <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30">
+                <Button
+                  variant={rowHeight === 'compact' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setRowHeight('compact')}
+                  title="Compact"
+                >
+                  Compact
+                </Button>
+                <Button
+                  variant={rowHeight === 'normal' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setRowHeight('normal')}
+                  title="Normal"
+                >
+                  Normal
+                </Button>
+                <Button
+                  variant={rowHeight === 'comfortable' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setRowHeight('comfortable')}
+                  title="Comfortable"
+                >
+                  Comfortable
+                </Button>
+              </div>
+            </div>
           </div>
 
           <DndContext

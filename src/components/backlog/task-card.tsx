@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { useProjectSettings } from '@/contexts/project-settings-context'
+import { useRowHeight } from '@/contexts/row-height-context'
 
 const priorityConfig: Record<Priority, { label: string; icon: string; color: string; bgColor: string }> = {
   LOW: { label: 'Low', icon: '↓', color: 'text-slate-600 dark:text-slate-300', bgColor: 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600' },
@@ -32,6 +33,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps) {
   const { statuses, getStatusConfig, getTeamConfig } = useProjectSettings()
+  const { getRowHeightClass } = useRowHeight()
   const {
     attributes,
     listeners,
@@ -114,7 +116,8 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-4 px-3 py-2.5 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors",
+        "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors",
+        getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background"
       )}
     >
