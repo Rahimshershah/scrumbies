@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>The Open Source JIRA & Confluence Alternative</strong><br/>
-  Sprint management shouldn't cost more than Netflix 🍿
+  Sprint management should cost as much as Netflix 🍿
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
 
 **Scrumbies gives you both — for free.** Self-host it, own your data, and never pay per-seat licensing again.
 
-> *"Sprint management should cost as much as Netflix, not as much as enterprise software."*
+> *"Why pay enterprise prices when Netflix costs $15/month?"*
 
 ---
 
