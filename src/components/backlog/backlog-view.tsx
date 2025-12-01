@@ -537,12 +537,38 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
     ? sprints.find(s => s.id === viewingSprint.id) || viewingSprint 
     : null
 
+  // Handle sprint reactivation (admin only)
+  const handleSprintReactivate = async (sprintId: string) => {
+    try {
+      const res = await fetch(`/api/sprints/${sprintId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE' }),
+      })
+      if (res.ok) {
+        const updatedSprint = await res.json()
+        setSprints(prev => prev.map(s => s.id === sprintId ? updatedSprint : s))
+        // If currently viewing this sprint, update the view
+        if (viewingSprint?.id === sprintId) {
+          setViewingSprint(updatedSprint)
+        }
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to reactivate sprint')
+      }
+    } catch (error) {
+      console.error('Failed to reactivate sprint:', error)
+    }
+  }
+
   return (
     <AppLayout
       activeSprint={activeSprints[0] || null}
       completedSprints={closedSprints}
       selectedSprint={viewingSprint}
       onSprintSelect={setViewingSprint}
+      currentUser={currentUser}
+      onSprintReactivate={handleSprintReactivate}
     >
       <div className="flex h-full">
         {/* Main content area */}

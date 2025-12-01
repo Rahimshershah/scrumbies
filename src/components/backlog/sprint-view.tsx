@@ -224,6 +224,31 @@ export function SprintView({
   const isAdmin = currentUser?.role === 'ADMIN'
   const isCompleted = sprint.status === 'COMPLETED'
   const canEdit = !isCompleted || isAdmin
+  const [reactivating, setReactivating] = useState(false)
+
+  const handleReactivateSprint = async () => {
+    if (!isAdmin) return
+    setReactivating(true)
+    try {
+      const res = await fetch(`/api/sprints/${localSprint.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACTIVE' }),
+      })
+      if (res.ok) {
+        const updatedSprint = await res.json()
+        setLocalSprint(updatedSprint)
+        onSprintUpdate?.(updatedSprint)
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to reactivate sprint')
+      }
+    } catch (error) {
+      console.error('Failed to reactivate sprint:', error)
+    } finally {
+      setReactivating(false)
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -359,9 +384,34 @@ export function SprintView({
                     {statusBadgeConfig[localSprint.status]?.label}
                   </Badge>
                   {isCompleted && isAdmin && (
-                    <Badge variant="outline" className="text-[10px]">
-                      Admin Edit Mode
-                    </Badge>
+                    <>
+                      <Badge variant="outline" className="text-[10px]">
+                        Admin Edit Mode
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReactivateSprint}
+                        disabled={reactivating}
+                        className="h-7 text-xs"
+                      >
+                        {reactivating ? (
+                          <>
+                            <svg className="w-3 h-3 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Reactivating...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Reactivate Sprint
+                          </>
+                        )}
+                      </Button>
+                    </>
                   )}
                 </div>
                 {(localSprint.startDate || localSprint.endDate) && (

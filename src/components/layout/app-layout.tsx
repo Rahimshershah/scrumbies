@@ -5,6 +5,12 @@ import { Sprint } from '@/types'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 interface AppLayoutProps {
@@ -13,6 +19,8 @@ interface AppLayoutProps {
   completedSprints: Sprint[]
   selectedSprint?: Sprint | null
   onSprintSelect: (sprint: Sprint | null) => void
+  currentUser?: { id: string; role: string }
+  onSprintReactivate?: (sprintId: string) => void
 }
 
 function formatDate(dateString: string | null | undefined) {
@@ -62,15 +70,20 @@ function Sidebar({
   activeSprint,
   completedSprints,
   selectedSprint,
-  onSprintSelect, 
+  onSprintSelect,
+  currentUser,
+  onSprintReactivate,
   className 
 }: {
   activeSprint?: Sprint | null
   completedSprints: Sprint[]
   selectedSprint?: Sprint | null
   onSprintSelect: (sprint: Sprint | null) => void
+  currentUser?: { id: string; role: string }
+  onSprintReactivate?: (sprintId: string) => void
   className?: string
 }) {
+  const isAdmin = currentUser?.role === 'ADMIN'
   return (
     <div className={cn("flex flex-col h-full bg-background border-r", className)}>
       {/* Navigation Menu */}
@@ -125,35 +138,55 @@ function Sidebar({
               const totalTasks = sprint.tasks.length
               
               return (
-                <button
-                  key={sprint.id}
-                  onClick={() => onSprintSelect(sprint)}
-                  className={cn(
-                    "w-full text-left px-3 py-2.5 rounded-lg transition-all group",
-                    isSelected 
-                      ? "bg-accent" 
-                      : "hover:bg-accent/50"
+                <div key={sprint.id} className="flex items-center gap-1">
+                  <button
+                    onClick={() => onSprintSelect(sprint)}
+                    className={cn(
+                      "flex-1 text-left px-3 py-2.5 rounded-lg transition-all group",
+                      isSelected 
+                        ? "bg-accent" 
+                        : "hover:bg-accent/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0 bg-gray-400" />
+                      <span className={cn(
+                        "text-sm truncate flex-1",
+                        isSelected ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
+                      )}>
+                        {sprint.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 ml-4">
+                      <span className="text-[10px] text-muted-foreground">
+                        {sprint.endDate ? formatDate(sprint.endDate) : 'No end date'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/50">•</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {completedTasks}/{totalTasks} done
+                      </span>
+                    </div>
+                  </button>
+                  {isAdmin && onSprintReactivate && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-1.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                          <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                          </svg>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onSprintReactivate(sprint.id)}>
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Reactivate Sprint
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0 bg-gray-400" />
-                    <span className={cn(
-                      "text-sm truncate flex-1",
-                      isSelected ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
-                    )}>
-                      {sprint.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 ml-4">
-                    <span className="text-[10px] text-muted-foreground">
-                      {sprint.endDate ? formatDate(sprint.endDate) : 'No end date'}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/50">•</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {completedTasks}/{totalTasks} done
-                    </span>
-                  </div>
-                </button>
+                </div>
               )
             })
           )}
@@ -169,6 +202,8 @@ export function AppLayout({
   completedSprints, 
   selectedSprint,
   onSprintSelect,
+  currentUser,
+  onSprintReactivate,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -180,7 +215,9 @@ export function AppLayout({
           activeSprint={activeSprint}
           completedSprints={completedSprints} 
           selectedSprint={selectedSprint}
-          onSprintSelect={onSprintSelect} 
+          onSprintSelect={onSprintSelect}
+          currentUser={currentUser}
+          onSprintReactivate={onSprintReactivate}
           className="w-full h-full" 
         />
       </aside>
@@ -207,7 +244,9 @@ export function AppLayout({
             onSprintSelect={(sprint) => {
               onSprintSelect(sprint)
               setSidebarOpen(false)
-            }} 
+            }}
+            currentUser={currentUser}
+            onSprintReactivate={onSprintReactivate}
           />
         </SheetContent>
       </Sheet>
