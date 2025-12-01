@@ -74,7 +74,7 @@ function LoginForm() {
           </p>
           
           <p className="text-lg text-white/50 mb-10">
-            Sprint management should cost as much as Netflix 🍿
+            Sprint management shouldn&apos;t cost more than Netflix 🍿
           </p>
 
           {/* Features */}

@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>The Open Source JIRA & Confluence Alternative</strong><br/>
-  Sprint management should cost as much as Netflix 🍿
+  Sprint management shouldn't cost more than Netflix 🍿
 </p>
 
 <p align="center">
