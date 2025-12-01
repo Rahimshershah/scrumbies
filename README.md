@@ -267,14 +267,17 @@ We believe in AI-augmented development, and Scrumbies is proof that you can buil
 <details>
 <summary>Click to see screenshots</summary>
 
-### Sprint Board
-![Sprint Board](docs/screenshots/sprint-board.png)
+### Sprint Board & Backlog
+![Sprint Board](docs/screenshots/1.png)
 
 ### Task Details
-![Task Details](docs/screenshots/task-details.png)
+![Task Details](docs/screenshots/2.png)
 
 ### Documentation Spaces
-![Spaces](docs/screenshots/spaces.png)
+![Spaces](docs/screenshots/3.png)
+
+### Team Collaboration
+![Collaboration](docs/screenshots/4.png)
 
 </details>
 
