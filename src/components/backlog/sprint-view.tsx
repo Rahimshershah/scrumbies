@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -245,9 +245,13 @@ export function SprintView({
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
   // Update local sprint when prop changes
-  if (sprint.id !== localSprint.id) {
-    setLocalSprint(sprint)
-  }
+  useEffect(() => {
+    if (sprint.id !== localSprint.id) {
+      setLocalSprint(sprint)
+      setSelectedTaskIds(new Set())
+      setLastSelectedIndex(null)
+    }
+  }, [sprint.id, localSprint.id])
 
   // Admin can edit completed sprints
   const isAdmin = currentUser?.role === 'ADMIN'
@@ -377,7 +381,9 @@ export function SprintView({
     const { active, over } = event
     setActiveTask(null)
 
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id) {
+      return
+    }
 
     const activeId = active.id as string
     const overId = over.id as string
@@ -412,10 +418,11 @@ export function SprintView({
 
     // Persist the new order automatically
     try {
-      // Move all selected tasks
-      const movePromises = tasksToMove.map((task, idx) => {
+      // Move all selected tasks sequentially to avoid race conditions
+      for (let idx = 0; idx < tasksToMove.length; idx++) {
+        const task = tasksToMove[idx]
         const newOrder = targetIndex + idx
-        return fetch('/api/tasks/reorder', {
+        const response = await fetch('/api/tasks/reorder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -424,9 +431,11 @@ export function SprintView({
             newOrder: newOrder,
           }),
         })
-      })
-
-      await Promise.all(movePromises)
+        
+        if (!response.ok) {
+          throw new Error(`Failed to move task ${task.id}`)
+        }
+      }
       
       // Clear selection after successful move
       setSelectedTaskIds(new Set())
