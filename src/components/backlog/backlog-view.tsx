@@ -788,12 +788,12 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                     {activeSprints.length}
                   </Badge>
                 </div>
-                {activeSprints.map((sprint) => (
+                {filteredActiveSprints.map((sprint) => (
                   <SprintSection
                     key={sprint.id}
                     sprint={sprint}
                     users={users}
-                    availableSprints={plannedSprints}
+                    availableSprints={filteredPlannedSprints}
                     projectId={projectId}
                     onTaskClick={handleTaskClick}
                     onCreateTask={handleCreateTask}
@@ -813,22 +813,22 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
             )}
 
             {/* Planned/Future Sprints */}
-            {plannedSprints.length > 0 && (
+            {filteredPlannedSprints.length > 0 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Upcoming Sprints
                   </h2>
                   <Badge variant="secondary">
-                    {plannedSprints.length}
+                    {filteredPlannedSprints.length}
                   </Badge>
                 </div>
-                {plannedSprints.map((sprint) => (
+                {filteredPlannedSprints.map((sprint) => (
                   <SprintSection
                     key={sprint.id}
                     sprint={sprint}
                     users={users}
-                    availableSprints={plannedSprints.filter(s => s.id !== sprint.id)}
+                    availableSprints={filteredPlannedSprints.filter(s => s.id !== sprint.id)}
                     projectId={projectId}
                     onTaskClick={handleTaskClick}
                     onCreateTask={handleCreateTask}
@@ -843,24 +843,38 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
             )}
 
             {/* Backlog Section */}
-            <div className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Backlog
-                </h2>
-                <Badge variant="outline">
-                  {backlogTasks.length}
-                </Badge>
+            {(filteredBacklogTasks.length > 0 || !searchQuery.trim()) && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Backlog
+                  </h2>
+                  <Badge variant="outline">
+                    {searchQuery.trim() ? filteredBacklogTasks.length : backlogTasks.length}
+                  </Badge>
+                </div>
+                <BacklogSection
+                  tasks={filteredBacklogTasks}
+                  users={users}
+                  projectId={projectId}
+                  onTaskClick={handleTaskClick}
+                  onCreateTask={handleCreateTask}
+                  onTaskUpdate={handleTaskUpdate}
+                />
               </div>
-              <BacklogSection
-                tasks={backlogTasks}
-                users={users}
-                projectId={projectId}
-                onTaskClick={handleTaskClick}
-                onCreateTask={handleCreateTask}
-                onTaskUpdate={handleTaskUpdate}
-              />
-            </div>
+            )}
+            
+            {/* No Search Results */}
+            {searchQuery.trim() && filteredActiveSprints.length === 0 && filteredPlannedSprints.length === 0 && filteredBacklogTasks.length === 0 && (
+              <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                <p className="text-muted-foreground mb-2">
+                  No tasks found matching "{searchQuery}"
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Try searching by task title, task key, or tags
+                </p>
+              </div>
+            )}
 
             {/* Empty State */}
             {visibleSprints.length === 0 && backlogTasks.length === 0 && (
