@@ -603,8 +603,6 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
     ))
   }, [])
 
-  const totalTasks = visibleSprints.reduce((acc, s) => acc + s.tasks.length, 0) + backlogTasks.length
-
   // Check if dragging from active sprint
   const isFromActiveSprint = pendingMove?.sourceSprintStatus === 'ACTIVE'
 
