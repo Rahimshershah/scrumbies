@@ -99,8 +99,8 @@ function SortableTaskRow({
       className={cn(
         "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
         getRowHeightClass(),
-        isDragging && "opacity-50 bg-background shadow-lg",
-        canEdit && "cursor-grab active:cursor-grabbing"
+        canEdit && "active:cursor-grabbing",
+        isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing"
       )}
     >
       {/* Drag handle indicator */}
@@ -330,28 +330,41 @@ export function SprintView({
     const oldIndex = localSprint.tasks.findIndex(t => t.id === active.id)
     const newIndex = localSprint.tasks.findIndex(t => t.id === over.id)
 
-    if (oldIndex === -1 || newIndex === -1) return
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
 
+    // Save original order for potential revert
+    const originalTasks = [...localSprint.tasks]
     const newTasks = arrayMove(localSprint.tasks, oldIndex, newIndex)
     
-    // Update local state immediately
+    // Update local state immediately (optimistic update)
     setLocalSprint(prev => ({
       ...prev,
       tasks: newTasks,
     }))
 
-    // Persist the new order
+    // Persist the new order automatically
     try {
-      await fetch('/api/tasks/reorder', {
+      const taskId = active.id as string
+      const response = await fetch('/api/tasks/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskIds: newTasks.map(t => t.id),
-          sprintId: localSprint.id,
+          taskId: taskId,
+          targetSprintId: localSprint.id,
+          newOrder: newIndex,
         }),
       })
+
+      if (!response.ok) {
+        throw new Error('Failed to save order')
+      }
     } catch (error) {
       console.error('Failed to reorder tasks:', error)
+      // Revert on error
+      setLocalSprint(prev => ({
+        ...prev,
+        tasks: originalTasks,
+      }))
     }
   }, [localSprint])
 

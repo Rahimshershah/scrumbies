@@ -118,9 +118,9 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
       {...attributes}
       {...listeners}
       className={cn(
-        "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing",
+        "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
         getRowHeightClass(),
-        isDragging && "opacity-50 shadow-lg bg-background"
+        isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing"
       )}
     >
       {/* Drag handle indicator */}

@@ -632,40 +632,39 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                   {totalTasks} tasks across {visibleSprints.length} sprints + backlog
                 </p>
               </div>
-              <Button onClick={() => setShowCreateSprint(true)}>
-                + New Sprint
-              </Button>
-            </div>
-            {/* Row Height Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Row height:</span>
-              <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30">
-                <Button
-                  variant={rowHeight === 'compact' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setRowHeight('compact')}
-                  title="Compact"
-                >
-                  Compact
-                </Button>
-                <Button
-                  variant={rowHeight === 'normal' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setRowHeight('normal')}
-                  title="Normal"
-                >
-                  Normal
-                </Button>
-                <Button
-                  variant={rowHeight === 'comfortable' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setRowHeight('comfortable')}
-                  title="Comfortable"
-                >
-                  Comfortable
+              <div className="flex items-center gap-3">
+                {/* Row Height Selector */}
+                <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30">
+                  <Button
+                    variant={rowHeight === 'compact' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setRowHeight('compact')}
+                    title="Compact"
+                  >
+                    Compact
+                  </Button>
+                  <Button
+                    variant={rowHeight === 'normal' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setRowHeight('normal')}
+                    title="Normal"
+                  >
+                    Normal
+                  </Button>
+                  <Button
+                    variant={rowHeight === 'comfortable' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setRowHeight('comfortable')}
+                    title="Comfortable"
+                  >
+                    Comfortable
+                  </Button>
+                </div>
+                <Button onClick={() => setShowCreateSprint(true)}>
+                  + New Sprint
                 </Button>
               </div>
             </div>
