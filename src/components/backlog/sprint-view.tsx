@@ -94,7 +94,6 @@ function SortableTaskRow({
     <div
       ref={setNodeRef}
       style={style}
-      onClick={onClick}
       {...(canEdit ? { ...attributes, ...listeners } : {})}
       className={cn(
         "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
@@ -129,7 +128,13 @@ function SortableTaskRow({
       </div>
 
       {/* Title */}
-      <div className="flex-1 flex items-center gap-2 min-w-0">
+      <div 
+        className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer hover:text-primary transition-colors"
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick()
+        }}
+      >
         {/* Task Key */}
         {task.taskKey && (
           <span className={cn(getTextSize('xs'), "font-mono text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded flex-shrink-0")}>

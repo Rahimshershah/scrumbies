@@ -636,34 +636,52 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                 {/* Row Height Selector */}
                 <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30">
                   <Button
+                    type="button"
                     variant={rowHeight === 'compact' ? 'default' : 'ghost'}
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    onClick={() => setRowHeight('compact')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setRowHeight('compact')
+                    }}
                     title="Compact"
                   >
                     Compact
                   </Button>
                   <Button
+                    type="button"
                     variant={rowHeight === 'normal' ? 'default' : 'ghost'}
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    onClick={() => setRowHeight('normal')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setRowHeight('normal')
+                    }}
                     title="Normal"
                   >
                     Normal
                   </Button>
                   <Button
+                    type="button"
                     variant={rowHeight === 'comfortable' ? 'default' : 'ghost'}
                     size="sm"
                     className="h-7 px-2 text-xs"
-                    onClick={() => setRowHeight('comfortable')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setRowHeight('comfortable')
+                    }}
                     title="Comfortable"
                   >
                     Comfortable
                   </Button>
                 </div>
-                <Button onClick={() => setShowCreateSprint(true)}>
+                <Button 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowCreateSprint(true)
+                  }}
+                >
                   + New Sprint
                 </Button>
               </div>

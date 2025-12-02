@@ -150,8 +150,11 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
 
       {/* Title with tags - clickable area */}
       <div 
-        className="flex-1 flex items-center gap-2 min-w-0 hover:text-primary transition-colors"
-        onClick={onClick}
+        className="flex-1 flex items-center gap-2 min-w-0 hover:text-primary transition-colors cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick()
+        }}
       >
         {/* Task Key */}
         {task.taskKey && (
