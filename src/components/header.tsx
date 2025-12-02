@@ -174,13 +174,11 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
   async function handleSaveProfile() {
     if (!profileName.trim()) return
 
-    // Validate password if user is trying to change it
+    // Validate password ONLY if user is actually trying to change it
+    // (i.e., both currentPassword and newPassword are provided)
     setPasswordError('')
-    if (newPassword || confirmPassword || currentPassword) {
-      if (!currentPassword) {
-        setPasswordError('Current password is required to change password')
-        return
-      }
+    const isChangingPassword = currentPassword && newPassword
+    if (isChangingPassword) {
       if (newPassword.length < 6) {
         setPasswordError('New password must be at least 6 characters')
         return
@@ -191,14 +189,21 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
       }
     }
 
+    // If only partial password fields are filled, clear them (user probably didn't mean to change password)
+    if ((currentPassword || newPassword || confirmPassword) && !isChangingPassword) {
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    }
+
     setSavingProfile(true)
     try {
       const body: Record<string, string> = {
         name: profileName.trim(),
       }
 
-      // Include password change if provided
-      if (currentPassword && newPassword) {
+      // Include password change only if both current and new passwords are provided
+      if (isChangingPassword) {
         body.currentPassword = currentPassword
         body.newPassword = newPassword
       }
