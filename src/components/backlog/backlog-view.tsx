@@ -778,14 +778,14 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
             onDragEnd={handleDragEnd}
           >
             {/* Active Sprints */}
-            {activeSprints.length > 0 && (
+            {filteredActiveSprints.length > 0 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-3">
                   <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Active Sprint
                   </h2>
                   <Badge variant="default" className="bg-green-500">
-                    {activeSprints.length}
+                    {filteredActiveSprints.length}
                   </Badge>
                 </div>
                 {filteredActiveSprints.map((sprint) => (
