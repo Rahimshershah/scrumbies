@@ -142,7 +142,13 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
     if (filterPriority !== 'ALL' && task.priority !== filterPriority) return false
     
     // Assignee filter
-    if (filterAssignee !== 'ALL' && task.assigneeId !== filterAssignee) return false
+    if (filterAssignee !== 'ALL') {
+      if (filterAssignee === 'UNASSIGNED') {
+        if (task.assigneeId !== null) return false
+      } else {
+        if (task.assigneeId !== filterAssignee) return false
+      }
+    }
     
     // Status filter
     if (filterStatus !== 'ALL' && task.status !== filterStatus) return false
