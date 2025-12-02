@@ -24,7 +24,9 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useRowHeight } from '@/contexts/row-height-context'
+import { TaskStatus, Priority } from '@/types'
 import {
   Dialog,
   DialogContent,
@@ -65,6 +67,9 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [lastOpenedTaskId, setLastOpenedTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterPriority, setFilterPriority] = useState<Priority | 'ALL'>('ALL')
+  const [filterAssignee, setFilterAssignee] = useState<string | 'ALL'>('ALL')
+  const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
@@ -128,6 +133,23 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
            tags.some(tag => tag.includes(searchLower))
   }, [])
 
+  // Combined filter function
+  const matchesFilters = useCallback((task: Task): boolean => {
+    // Search filter
+    if (!matchesSearch(task, searchQuery)) return false
+    
+    // Priority filter
+    if (filterPriority !== 'ALL' && task.priority !== filterPriority) return false
+    
+    // Assignee filter
+    if (filterAssignee !== 'ALL' && task.assigneeId !== filterAssignee) return false
+    
+    // Status filter
+    if (filterStatus !== 'ALL' && task.status !== filterStatus) return false
+    
+    return true
+  }, [searchQuery, filterPriority, filterAssignee, filterStatus, matchesSearch])
+
   // Categorize sprints
   const activeSprints = sprints.filter(s => s.status === 'ACTIVE')
   const plannedSprints = sprints.filter(s => s.status === 'PLANNED')
@@ -136,18 +158,18 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
   // Non-closed sprints for drag-drop
   const visibleSprints = [...activeSprints, ...plannedSprints]
   
-  // Filter tasks based on search query
+  // Filter tasks based on search query and filters
   const filteredActiveSprints = activeSprints.map(sprint => ({
     ...sprint,
-    tasks: sprint.tasks.filter(task => matchesSearch(task, searchQuery))
-  })).filter(sprint => sprint.tasks.length > 0 || !searchQuery.trim())
+    tasks: sprint.tasks.filter(task => matchesFilters(task))
+  })).filter(sprint => sprint.tasks.length > 0 || (!searchQuery.trim() && filterPriority === 'ALL' && filterAssignee === 'ALL' && filterStatus === 'ALL'))
   
   const filteredPlannedSprints = plannedSprints.map(sprint => ({
     ...sprint,
-    tasks: sprint.tasks.filter(task => matchesSearch(task, searchQuery))
-  })).filter(sprint => sprint.tasks.length > 0 || !searchQuery.trim())
+    tasks: sprint.tasks.filter(task => matchesFilters(task))
+  })).filter(sprint => sprint.tasks.length > 0 || (!searchQuery.trim() && filterPriority === 'ALL' && filterAssignee === 'ALL' && filterStatus === 'ALL'))
   
-  const filteredBacklogTasks = backlogTasks.filter(task => matchesSearch(task, searchQuery))
+  const filteredBacklogTasks = backlogTasks.filter(task => matchesFilters(task))
   
   // Calculate total tasks (for display)
   const totalTasks = visibleSprints.reduce((sum, s) => sum + s.tasks.length, 0) + backlogTasks.length
@@ -670,10 +692,10 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
               <div>
                 <h1 className="text-2xl font-bold">Backlog</h1>
                 <p className="text-sm text-muted-foreground">
-                  {searchQuery.trim() ? (
+                  {(searchQuery.trim() || filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL') ? (
                     <>
                       {filteredTotalTasks} of {totalTasks} tasks
-                      {filteredTotalTasks !== totalTasks && ' matching search'}
+                      {filteredTotalTasks !== totalTasks && ' matching filters'}
                     </>
                   ) : (
                     <>
@@ -737,8 +759,8 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
               </div>
             </div>
             
-            {/* Search Bar */}
-            <div className="mt-4">
+            {/* Search Bar and Filters */}
+            <div className="mt-4 space-y-3">
               <div className="relative max-w-md">
                 <Input
                   type="text"
@@ -765,6 +787,68 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
+                )}
+              </div>
+              
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <Select value={filterPriority} onValueChange={(value) => setFilterPriority(value as Priority | 'ALL')}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Priorities</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="LOW">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterAssignee} onValueChange={(value) => setFilterAssignee(value)}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue placeholder="Assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Assignees</SelectItem>
+                    <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as TaskStatus | 'ALL')}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Statuses</SelectItem>
+                    <SelectItem value="TODO">Todo</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="READY_TO_TEST">Ready to Test</SelectItem>
+                    <SelectItem value="BLOCKED">Blocked</SelectItem>
+                    <SelectItem value="DONE">Done</SelectItem>
+                    <SelectItem value="LIVE">Live</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {(filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL' || searchQuery.trim()) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setFilterPriority('ALL')
+                      setFilterAssignee('ALL')
+                      setFilterStatus('ALL')
+                    }}
+                    className="h-9 text-xs"
+                  >
+                    Clear Filters
+                  </Button>
                 )}
               </div>
             </div>
@@ -865,13 +949,14 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
             )}
             
             {/* No Search Results */}
-            {searchQuery.trim() && filteredActiveSprints.length === 0 && filteredPlannedSprints.length === 0 && filteredBacklogTasks.length === 0 && (
+            {(searchQuery.trim() || filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL') && 
+             filteredActiveSprints.length === 0 && filteredPlannedSprints.length === 0 && filteredBacklogTasks.length === 0 && (
               <div className="text-center py-12 border-2 border-dashed rounded-lg">
                 <p className="text-muted-foreground mb-2">
-                  No tasks found matching "{searchQuery}"
+                  No tasks found matching your filters
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Try searching by task title, task key, or tags
+                  Try adjusting your search or filter criteria
                 </p>
               </div>
             )}
