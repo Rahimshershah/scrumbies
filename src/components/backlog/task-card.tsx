@@ -33,7 +33,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps) {
   const { statuses, getStatusConfig, getTeamConfig } = useProjectSettings()
-  const { getRowHeightClass, getTextSize, getAvatarSize, getScale } = useRowHeight()
+  const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
     attributes,
     listeners,
