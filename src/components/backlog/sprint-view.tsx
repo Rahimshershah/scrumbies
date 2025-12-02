@@ -95,19 +95,18 @@ function SortableTaskRow({
       ref={setNodeRef}
       style={style}
       onClick={onClick}
+      {...(canEdit ? { ...attributes, ...listeners } : {})}
       className={cn(
-        "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 cursor-pointer transition-colors",
+        "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
         getRowHeightClass(),
-        isDragging && "opacity-50 bg-background shadow-lg"
+        isDragging && "opacity-50 bg-background shadow-lg",
+        canEdit && "cursor-grab active:cursor-grabbing"
       )}
     >
-      {/* Drag handle */}
+      {/* Drag handle indicator */}
       {canEdit && (
         <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
+          className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 pointer-events-none"
         >
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
             <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />

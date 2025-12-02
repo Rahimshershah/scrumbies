@@ -115,17 +115,17 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors",
+        "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing",
         getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background"
       )}
     >
-      {/* Drag handle */}
+      {/* Drag handle indicator */}
       <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
+        className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 pointer-events-none"
         onClick={(e) => e.stopPropagation()}
       >
         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -150,7 +150,7 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
 
       {/* Title with tags - clickable area */}
       <div 
-        className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer hover:text-primary transition-colors"
+        className="flex-1 flex items-center gap-2 min-w-0 hover:text-primary transition-colors"
         onClick={onClick}
       >
         {/* Task Key */}
