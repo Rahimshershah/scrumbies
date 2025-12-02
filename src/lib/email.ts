@@ -85,9 +85,9 @@ function emailWrapper(content: string): string {
 function avatarPlaceholder(name: string, size: number = 40): string {
   const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   return `
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-radius: 50%; background: linear-gradient(135deg, ${brandStyles.primary}, #7c3aed);">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-radius: 50%; background: linear-gradient(135deg, ${brandStyles.primary}, #7c3aed); width: ${size}px; height: ${size}px; min-width: ${size}px; min-height: ${size}px; table-layout: fixed;">
       <tr>
-        <td width="${size}" height="${size}" align="center" valign="middle" style="border-radius: 50%; color: white; font-weight: 600; font-size: ${Math.floor(size * 0.4)}px;">
+        <td width="${size}" height="${size}" align="center" valign="middle" style="border-radius: 50%; color: white; font-weight: 600; font-size: ${Math.floor(size * 0.4)}px; min-width: ${size}px; min-height: ${size}px; line-height: ${size}px;">
           ${initials}
         </td>
       </tr>
