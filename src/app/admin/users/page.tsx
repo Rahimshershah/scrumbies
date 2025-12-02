@@ -79,10 +79,12 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchData() {
     setLoading(true)
+    setError(null)
     try {
       const [usersRes, invitesRes, projectsRes] = await Promise.all([
         fetch('/api/users/all'),
@@ -92,21 +94,27 @@ export default function AdminUsersPage() {
 
       if (usersRes.ok) {
         const usersData = await usersRes.json()
-        setUsers(usersData)
+        setUsers(usersData || [])
+      } else {
+        console.error('Failed to fetch users:', usersRes.status)
       }
 
       if (invitesRes.ok) {
         const invitesData = await invitesRes.json()
-        setInvites(invitesData)
+        setInvites(invitesData || [])
+      } else {
+        console.error('Failed to fetch invites:', invitesRes.status)
       }
 
       if (projectsRes.ok) {
         const projectsData = await projectsRes.json()
-        setProjects(projectsData)
+        setProjects(projectsData || [])
+      } else {
+        console.error('Failed to fetch projects:', projectsRes.status)
       }
     } catch (err) {
       setError('Failed to load data')
-      console.error(err)
+      console.error('Error fetching data:', err)
     } finally {
       setLoading(false)
     }
