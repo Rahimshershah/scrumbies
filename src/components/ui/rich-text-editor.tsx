@@ -496,7 +496,8 @@ export function RichTextEditor({
     }
   }, [hasContent])
 
-  const showToolbar = editable && (!minimal || isExpanded || isFocused || hasContent)
+  // Only show toolbar when editor is focused (not just when it has content)
+  const showToolbar = editable && (!minimal || isFocused)
 
   return (
     <div 

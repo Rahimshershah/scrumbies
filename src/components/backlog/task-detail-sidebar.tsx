@@ -304,11 +304,10 @@ export function TaskDetailSidebar({
     const file = e.target.files?.[0]
     if (!file) return
     
-    // Validate file size (20MB for videos, 10MB for others)
-    const isVideo = file.type.startsWith('video/')
-    const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024
+    // Validate file size (25MB for all files)
+    const maxSize = 25 * 1024 * 1024 // 25MB
     if (file.size > maxSize) {
-      alert(`File too large. Maximum size is ${isVideo ? '20MB for videos' : '10MB'}.`)
+      alert(`File too large. Maximum size is 25MB.`)
       e.target.value = '' // Reset input
       return
     }

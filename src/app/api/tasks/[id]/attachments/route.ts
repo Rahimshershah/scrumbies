@@ -60,12 +60,11 @@ export async function POST(
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Validate file size (20MB for videos, 10MB for others)
-    const isVideo = file.type.startsWith('video/')
-    const maxSize = isVideo ? 20 * 1024 * 1024 : 10 * 1024 * 1024 // 20MB for videos, 10MB for others
+    // Validate file size (25MB for all files)
+    const maxSize = 25 * 1024 * 1024 // 25MB
     if (file.size > maxSize) {
       return NextResponse.json({ 
-        error: `File too large. Maximum size is ${isVideo ? '20MB for videos' : '10MB'}.` 
+        error: `File too large. Maximum size is 25MB.` 
       }, { status: 400 })
     }
 

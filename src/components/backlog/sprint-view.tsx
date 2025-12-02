@@ -61,7 +61,7 @@ function SortableTaskRow({
   canEdit: boolean
 }) {
   const { getStatusConfig, getTeamConfig } = useProjectSettings()
-  const { getRowHeightClass } = useRowHeight()
+  const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
     attributes,
     listeners,
@@ -108,7 +108,7 @@ function SortableTaskRow({
         <div
           className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 pointer-events-none"
         >
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+          <svg className={getIconSize(3.5)} fill="currentColor" viewBox="0 0 20 20">
             <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
           </svg>
         </div>
@@ -118,13 +118,13 @@ function SortableTaskRow({
       <div className="w-20 flex-shrink-0">
         {teamStyle ? (
           <Badge 
-            className="text-xs font-semibold px-2 py-0.5"
+            className={cn(getTextSize('xs'), "font-semibold px-2 py-0.5")}
             style={{ backgroundColor: teamStyle.bgColor, color: teamStyle.color }}
           >
             {teamStyle.shortLabel}
           </Badge>
         ) : (
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className={cn(getTextSize('xs'), "text-muted-foreground")}>—</span>
         )}
       </div>
 
@@ -132,17 +132,17 @@ function SortableTaskRow({
       <div className="flex-1 flex items-center gap-2 min-w-0">
         {/* Task Key */}
         {task.taskKey && (
-          <span className="text-xs font-mono text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded flex-shrink-0">
+          <span className={cn(getTextSize('xs'), "font-mono text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded flex-shrink-0")}>
             {task.taskKey}
           </span>
         )}
         {tags.map((tag) => (
-          <Badge key={tag} variant="outline" className="text-xs flex-shrink-0">
+          <Badge key={tag} variant="outline" className={cn(getTextSize('xs'), "flex-shrink-0")}>
             {tag}
           </Badge>
         ))}
         <span className={cn(
-          "text-base truncate",
+          getTextSize('base'), "truncate",
           (task.status === 'DONE' || task.status === 'LIVE') && "line-through text-muted-foreground"
         )}>
           {displayTitle}
@@ -150,12 +150,12 @@ function SortableTaskRow({
         
         {/* Split indicators */}
         {task.splitFrom && (
-          <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded flex-shrink-0">
+          <span className={cn(getTextSize('xs'), "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded flex-shrink-0")}>
             cont.
           </span>
         )}
         {task.splitTasks && task.splitTasks.length > 0 && (
-          <span className="text-xs text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.5 rounded flex-shrink-0">
+          <span className={cn(getTextSize('xs'), "text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.5 rounded flex-shrink-0")}>
             ↔ {task.splitTasks.length}
           </span>
         )}
@@ -164,7 +164,7 @@ function SortableTaskRow({
       {/* Status */}
       <div className="w-32 flex-shrink-0">
         <span 
-          className="px-2 py-1 rounded text-xs font-semibold uppercase"
+          className={cn("px-2 py-1 rounded", getTextSize('xs'), "font-semibold uppercase")}
           style={{ backgroundColor: status.bgColor, color: status.color }}
         >
           {status.label}
@@ -173,24 +173,24 @@ function SortableTaskRow({
 
       {/* Priority */}
       <div className="w-10 flex-shrink-0 text-center">
-        <span className={cn("text-base font-bold", priority.color)}>
+        <span className={cn(getTextSize('base'), "font-bold", priority.color)}>
           {priority.icon}
         </span>
       </div>
 
       {/* Assignee */}
-      <div className="w-9 flex-shrink-0">
+      <div className="flex-shrink-0" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
         {task.assignee ? (
-          <Avatar className="w-9 h-9">
+          <Avatar style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
             {task.assignee.avatarUrl ? (
               <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
             ) : null}
-            <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+            <AvatarFallback className={cn(getTextSize('sm'), "bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold")}>
               {task.assignee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
             </AvatarFallback>
           </Avatar>
         ) : (
-          <div className="w-9 h-9 rounded-full border-2 border-dashed border-muted-foreground/30" />
+          <div className="rounded-full border-2 border-dashed border-muted-foreground/30" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} />
         )}
       </div>
     </div>

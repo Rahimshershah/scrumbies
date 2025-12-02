@@ -33,7 +33,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps) {
   const { statuses, getStatusConfig, getTeamConfig } = useProjectSettings()
-  const { getRowHeightClass } = useRowHeight()
+  const { getRowHeightClass, getTextSize, getAvatarSize, getScale } = useRowHeight()
   const {
     attributes,
     listeners,
@@ -138,13 +138,13 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
         {teamConfig ? (
           <Badge 
             variant="outline" 
-            className="text-xs font-semibold px-2 py-0.5 h-6 border-0"
-            style={{ backgroundColor: teamConfig.bgColor, color: teamConfig.color }}
+            className={cn(getTextSize('xs'), "font-semibold px-2 py-0.5 border-0")}
+            style={{ backgroundColor: teamConfig.bgColor, color: teamConfig.color, height: `${6 * getScale() * 0.25}rem` }}
           >
             {teamConfig.shortLabel}
           </Badge>
         ) : (
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className={cn(getTextSize('xs'), "text-muted-foreground")}>—</span>
         )}
       </div>
 
@@ -155,27 +155,27 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
       >
         {/* Task Key */}
         {task.taskKey && (
-          <span className="text-xs font-mono text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded flex-shrink-0">
+          <span className={cn(getTextSize('xs'), "font-mono text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded flex-shrink-0")}>
             {task.taskKey}
           </span>
         )}
         {tags.map((tag) => (
-          <Badge key={tag} variant="outline" className="text-xs font-normal px-1.5 py-0 h-5 flex-shrink-0">
+          <Badge key={tag} variant="outline" className={cn(getTextSize('xs'), "font-normal px-1.5 py-0 flex-shrink-0")} style={{ height: `${5 * getScale() * 0.25}rem` }}>
             {tag}
           </Badge>
         ))}
         <span className={cn(
-          "text-base truncate",
+          getTextSize('base'), "truncate",
           (task.status === 'DONE' || task.status === 'LIVE') && "line-through text-muted-foreground"
         )}>{displayTitle}</span>
         
         {/* Split indicators */}
         {task.splitFrom && (
           <span 
-            className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-0.5 flex-shrink-0 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded"
+            className={cn(getTextSize('xs'), "text-amber-700 dark:text-amber-300 flex items-center gap-0.5 flex-shrink-0 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded")}
             title={`Continuation of: ${task.splitFrom.title}`}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={getIconSize(3.5)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
             cont.
@@ -183,10 +183,10 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
         )}
         {task.splitTasks && task.splitTasks.length > 0 && (
           <span 
-            className="text-xs text-purple-700 dark:text-purple-300 flex items-center gap-0.5 flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.5 rounded"
+            className={cn(getTextSize('xs'), "text-purple-700 dark:text-purple-300 flex items-center gap-0.5 flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.5 rounded")}
             title={`Split into ${task.splitTasks.length} task(s)`}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={getIconSize(3.5)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
             {task.splitTasks.length}
@@ -195,8 +195,8 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
 
         {/* Comment count */}
         {task._count && task._count.comments > 0 && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span className={cn(getTextSize('xs'), "text-muted-foreground flex items-center gap-1 flex-shrink-0")}>
+            <svg className={getIconSize(3.5)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             {task._count.comments}
@@ -209,14 +209,14 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button
-              className="w-full px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide transition-colors text-center"
+              className={cn("w-full px-2 py-1 rounded", getTextSize('xs'), "font-semibold uppercase tracking-wide transition-colors text-center")}
               style={{ backgroundColor: status.bgColor, color: status.color }}
             >
               {status.label}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel className="text-xs">Set Status</DropdownMenuLabel>
+            <DropdownMenuLabel className={getTextSize('xs')}>Set Status</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {statuses.map((s) => (
               <DropdownMenuItem
@@ -236,7 +236,7 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
                 />
                 <span>{s.name}</span>
                 {task.status === s.key && (
-                  <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={cn(getIconSize(4), "ml-auto")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -252,17 +252,19 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button
               className={cn(
-                "w-full flex items-center justify-center h-7 rounded text-base font-bold transition-colors",
+                "w-full flex items-center justify-center rounded font-bold transition-colors",
+                getTextSize('base'),
                 priority.bgColor,
                 priority.color
               )}
+              style={{ height: `${7 * getScale() * 0.25}rem` }}
               title={`Priority: ${priority.label}`}
             >
               {priority.icon}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel className="text-xs">Set Priority</DropdownMenuLabel>
+            <DropdownMenuLabel className={getTextSize('xs')}>Set Priority</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {(Object.keys(priorityConfig) as Priority[]).map((p) => (
               <DropdownMenuItem
@@ -292,28 +294,28 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
       </div>
 
       {/* Assignee dropdown */}
-      <div className="w-9 flex-shrink-0">
+      <div className={cn("flex-shrink-0")} style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             {task.assignee ? (
-              <Avatar className="w-9 h-9 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all">
+              <Avatar className={cn("cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all")} style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
                 {task.assignee.avatarUrl ? (
                   <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
                 ) : null}
-                <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                <AvatarFallback className={cn(getTextSize('sm'), "bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold")}>
                   {task.assignee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
             ) : (
-              <button className="w-9 h-9 rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 flex items-center justify-center transition-colors">
-                <svg className="w-4 h-4 text-muted-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 flex items-center justify-center transition-colors" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
+                <svg className={cn(getIconSize(4), "text-muted-foreground/50")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </button>
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel className="text-xs">Assign to</DropdownMenuLabel>
+            <DropdownMenuLabel className={getTextSize('xs')}>Assign to</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={(e) => {
@@ -322,14 +324,14 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
               }}
               className={cn(!task.assigneeId && "bg-accent")}
             >
-              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center mr-2">
-                <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="rounded-full bg-muted flex items-center justify-center mr-2" style={{ width: `${5 * getScale() * 0.25}rem`, height: `${5 * getScale() * 0.25}rem` }}>
+                <svg className={getIconSize(3)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
               <span>Unassigned</span>
               {!task.assigneeId && (
-                <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={cn(getIconSize(4), "ml-auto")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               )}
@@ -347,11 +349,11 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
                   task.assigneeId === user.id && "bg-accent"
                 )}
               >
-                <Avatar className="w-5 h-5">
+                <Avatar style={{ width: `${5 * getScale() * 0.25}rem`, height: `${5 * getScale() * 0.25}rem` }}>
                   {user.avatarUrl ? (
                     <AvatarImage src={user.avatarUrl} alt={user.name} />
                   ) : null}
-                  <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                  <AvatarFallback className={cn(getTextSize('xs'), "bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold")}>
                     {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
