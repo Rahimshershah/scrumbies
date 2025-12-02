@@ -101,11 +101,16 @@ function SortableTaskRow({
       ref={setNodeRef}
       style={style}
       {...(canEdit ? { ...attributes, ...listeners } : {})}
-      onClick={(e) => {
-        if (e.shiftKey && canEdit) {
+      onMouseDown={(e) => {
+        // Handle shift-click for multi-select
+        if (e.shiftKey && canEdit && !isDragging) {
           e.stopPropagation()
-          onSelect(e, index)
-        } else if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          onSelect(e as any, index)
+        }
+      }}
+      onClick={(e) => {
+        // Regular click opens task details (but not if shift was held)
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !isDragging) {
           onClick()
         }
       }}
@@ -114,7 +119,7 @@ function SortableTaskRow({
         getRowHeightClass(),
         canEdit && "active:cursor-grabbing",
         isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing",
-        isSelected && "bg-primary/10 border-primary/20"
+        isSelected && "bg-primary/10 border-primary/20 ring-1 ring-primary/30"
       )}
     >
       {/* Drag handle indicator */}
