@@ -366,32 +366,36 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
                   <div className="border rounded-lg p-2 max-h-[100px] overflow-auto space-y-1">
-                    {projects.map((project) => (
-                      <label
-                        key={project.id}
-                        className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={selectedProjects.has(project.id)}
-                          onCheckedChange={(checked) => {
-                            const next = new Set(selectedProjects)
-                            if (checked) next.add(project.id)
-                            else next.delete(project.id)
-                            setSelectedProjects(next)
-                          }}
-                        />
-                        <div className="flex items-center gap-1.5">
-                          {project.logoUrl ? (
-                            <img src={project.logoUrl} alt="" className="w-4 h-4 rounded" />
-                          ) : (
-                            <div className="w-4 h-4 rounded bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
-                              {project.key.slice(0, 2)}
-                            </div>
-                          )}
-                          <span className="text-sm">{project.name}</span>
-                        </div>
-                      </label>
-                    ))}
+                    {projects && Array.isArray(projects) && projects.length > 0 ? (
+                      projects.map((project) => (
+                        <label
+                          key={project.id}
+                          className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={selectedProjects.has(project.id)}
+                            onCheckedChange={(checked) => {
+                              const next = new Set(selectedProjects)
+                              if (checked) next.add(project.id)
+                              else next.delete(project.id)
+                              setSelectedProjects(next)
+                            }}
+                          />
+                          <div className="flex items-center gap-1.5">
+                            {project.logoUrl ? (
+                              <img src={project.logoUrl} alt={project.name || ''} className="w-4 h-4 rounded" />
+                            ) : (
+                              <div className="w-4 h-4 rounded bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                                {project.key?.slice(0, 2) || '??'}
+                              </div>
+                            )}
+                            <span className="text-sm">{project.name || 'Unknown'}</span>
+                          </div>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="text-xs text-muted-foreground p-2">No projects available</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -439,31 +443,33 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       {/* Project avatars */}
-                      <div className="flex -space-x-1">
-                        {invite.projects.slice(0, 4).map((project) => (
-                          <Tooltip key={project.id}>
-                            <TooltipTrigger>
-                              {project.logoUrl ? (
-                                <img
-                                  src={project.logoUrl}
-                                  alt={project.name}
-                                  className="w-6 h-6 rounded border-2 border-white"
-                                />
-                              ) : (
-                                <div className="w-6 h-6 rounded border-2 border-white bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
-                                  {project.key.slice(0, 2)}
-                                </div>
-                              )}
-                            </TooltipTrigger>
-                            <TooltipContent>{project.name}</TooltipContent>
-                          </Tooltip>
-                        ))}
-                        {invite.projects.length > 4 && (
-                          <div className="w-6 h-6 rounded border-2 border-white bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
-                            +{invite.projects.length - 4}
-                          </div>
-                        )}
-                      </div>
+                      {invite.projects && Array.isArray(invite.projects) && invite.projects.length > 0 && (
+                        <div className="flex -space-x-1">
+                          {invite.projects.slice(0, 4).map((project) => (
+                            <Tooltip key={project.id}>
+                              <TooltipTrigger>
+                                {project.logoUrl ? (
+                                  <img
+                                    src={project.logoUrl}
+                                    alt={project.name || ''}
+                                    className="w-6 h-6 rounded border-2 border-white"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 rounded border-2 border-white bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                                    {project.key?.slice(0, 2) || '??'}
+                                  </div>
+                                )}
+                              </TooltipTrigger>
+                              <TooltipContent>{project.name || 'Unknown'}</TooltipContent>
+                            </Tooltip>
+                          ))}
+                          {invite.projects.length > 4 && (
+                            <div className="w-6 h-6 rounded border-2 border-white bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                              +{invite.projects.length - 4}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -533,15 +539,15 @@ export default function AdminUsersPage() {
                         <Avatar className="h-8 w-8">
                           {user.avatarUrl && <AvatarImage src={user.avatarUrl} />}
                           <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                            {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                            {user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??'}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium">{user.name}</span>
+                        <span className="font-medium">{user.name || 'Unknown'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
-                      {user.projects && user.projects.length > 0 ? (
+                      {user.projects && Array.isArray(user.projects) && user.projects.length > 0 ? (
                         <div className="flex -space-x-1">
                           {user.projects.slice(0, 4).map((project) => (
                             <Tooltip key={project.id}>
@@ -549,16 +555,16 @@ export default function AdminUsersPage() {
                                 {project.logoUrl ? (
                                   <img
                                     src={project.logoUrl}
-                                    alt={project.name}
+                                    alt={project.name || ''}
                                     className="w-6 h-6 rounded border-2 border-white"
                                   />
                                 ) : (
                                   <div className="w-6 h-6 rounded border-2 border-white bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
-                                    {project.key.slice(0, 2)}
+                                    {project.key?.slice(0, 2) || '??'}
                                   </div>
                                 )}
                               </TooltipTrigger>
-                              <TooltipContent>{project.name}</TooltipContent>
+                              <TooltipContent>{project.name || 'Unknown'}</TooltipContent>
                             </Tooltip>
                           ))}
                           {user.projects.length > 4 && (
@@ -569,7 +575,7 @@ export default function AdminUsersPage() {
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {user.projects.slice(4).map(p => p.name).join(', ')}
+                                {user.projects.slice(4).map(p => p.name || 'Unknown').join(', ')}
                               </TooltipContent>
                             </Tooltip>
                           )}
