@@ -177,7 +177,7 @@ function SortableTaskRow({
       </div>
 
       {/* Priority */}
-      <div className="w-10 flex-shrink-0 text-center">
+      <div className="w-10 flex-shrink-0 text-center ml-2">
         <span className={cn(getTextSize('base'), "font-bold", priority.color)}>
           {priority.icon}
         </span>

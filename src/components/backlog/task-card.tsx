@@ -250,7 +250,7 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
       </div>
 
       {/* Priority dropdown */}
-      <div className="w-10 flex-shrink-0">
+      <div className="w-10 flex-shrink-0 ml-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button
