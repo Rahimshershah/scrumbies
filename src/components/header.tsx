@@ -568,121 +568,124 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
             <DialogTitle>Edit Profile</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6 py-4">
-            {/* Avatar Upload */}
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <Avatar className="w-24 h-24">
-                  {profileAvatar ? (
-                    <AvatarImage src={profileAvatar} alt={profileName} />
-                  ) : null}
-                  <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-                    {profileName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <button
-                  onClick={() => avatarInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                  className="absolute bottom-0 right-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
-                >
-                  {uploadingAvatar ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveProfile(); }}>
+            <div className="space-y-6 py-4">
+              {/* Avatar Upload */}
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <Avatar className="w-24 h-24">
+                    {profileAvatar ? (
+                      <AvatarImage src={profileAvatar} alt={profileName} />
+                    ) : null}
+                    <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                      {profileName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors"
+                  >
+                    {uploadingAvatar ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <p className="text-xs text-muted-foreground">Click the camera icon to upload a new photo</p>
+              </div>
+
+              {/* Name */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Full Name</label>
+                <Input
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="Your name"
+                />
+              </div>
+
+              {/* Email (read-only) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Address</label>
+                <div className="px-3 py-2 bg-muted rounded-md text-sm">
+                  {profileEmail}
+                </div>
+              </div>
+
+              {/* Role (read-only) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Role</label>
+                <div className="px-3 py-2 bg-muted rounded-md text-sm">
+                  {user.role === 'ADMIN' ? 'Administrator' : 'Member'}
+                </div>
+              </div>
+
+              {/* Password Change Section */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium mb-3">Change Password</h4>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Current Password</label>
+                    <Input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Enter current password"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">New Password</label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password (min 6 characters)"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Confirm New Password</label>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  {passwordError && (
+                    <p className="text-xs text-red-500">{passwordError}</p>
                   )}
-                </button>
-              </div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarUpload}
-              />
-              <p className="text-xs text-muted-foreground">Click the camera icon to upload a new photo</p>
-            </div>
-
-            {/* Name */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Full Name</label>
-              <Input
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                placeholder="Your name"
-              />
-            </div>
-
-            {/* Email (read-only) */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email Address</label>
-              <div className="px-3 py-2 bg-muted rounded-md text-sm">
-                {profileEmail}
-              </div>
-            </div>
-
-            {/* Role (read-only) */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Role</label>
-              <div className="px-3 py-2 bg-muted rounded-md text-sm">
-                {user.role === 'ADMIN' ? 'Administrator' : 'Member'}
-              </div>
-            </div>
-
-            {/* Password Change Section */}
-            <div className="border-t pt-4 mt-4">
-              <h4 className="text-sm font-medium mb-3">Change Password</h4>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Current Password</label>
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                  />
+                  <p className="text-xs text-muted-foreground">Leave blank to keep current password</p>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">New Password</label>
-                  <Input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password (min 6 characters)"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Confirm New Password</label>
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                  />
-                </div>
-                {passwordError && (
-                  <p className="text-xs text-red-500">{passwordError}</p>
-                )}
-                <p className="text-xs text-muted-foreground">Leave blank to keep current password</p>
               </div>
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowProfile(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveProfile} 
-              disabled={savingProfile || !profileName.trim()}
-            >
-              {savingProfile ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setShowProfile(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={savingProfile || !profileName.trim()}
+              >
+                {savingProfile ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

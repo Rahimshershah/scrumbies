@@ -136,7 +136,8 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     await writeFile(filePath, buffer)
 
-    const avatarUrl = `/uploads/avatars/${uniqueFilename}`
+    // Use API route for serving avatars in standalone mode
+    const avatarUrl = `/api/uploads/avatars/${uniqueFilename}`
 
     // Update user's avatar URL
     const updatedUser = await prisma.user.update({
