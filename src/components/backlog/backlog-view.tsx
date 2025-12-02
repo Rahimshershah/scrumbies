@@ -23,6 +23,7 @@ import { SprintView } from './sprint-view'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { useRowHeight } from '@/contexts/row-height-context'
 import {
   Dialog,
@@ -63,6 +64,7 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
   const [viewingSprint, setViewingSprint] = useState<Sprint | null>(null)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [lastOpenedTaskId, setLastOpenedTaskId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
@@ -104,6 +106,28 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
     setLastOpenedTaskId(null)
   }, [projectId, initialSprints, initialBacklog])
 
+  // Search filter function
+  const matchesSearch = useCallback((task: Task, query: string): boolean => {
+    if (!query.trim()) return true
+    
+    const searchLower = query.toLowerCase().trim()
+    const title = task.title?.toLowerCase() || ''
+    const taskKey = task.taskKey?.toLowerCase() || ''
+    
+    // Extract tags from title
+    const tagRegex = /\[([^\]]+)\]/g
+    const tags: string[] = []
+    let match
+    while ((match = tagRegex.exec(task.title || '')) !== null) {
+      tags.push(match[1].toLowerCase())
+    }
+    
+    // Search in title, taskKey, and tags
+    return title.includes(searchLower) || 
+           taskKey.includes(searchLower) || 
+           tags.some(tag => tag.includes(searchLower))
+  }, [])
+
   // Categorize sprints
   const activeSprints = sprints.filter(s => s.status === 'ACTIVE')
   const plannedSprints = sprints.filter(s => s.status === 'PLANNED')
@@ -111,6 +135,25 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
 
   // Non-closed sprints for drag-drop
   const visibleSprints = [...activeSprints, ...plannedSprints]
+  
+  // Filter tasks based on search query
+  const filteredActiveSprints = activeSprints.map(sprint => ({
+    ...sprint,
+    tasks: sprint.tasks.filter(task => matchesSearch(task, searchQuery))
+  })).filter(sprint => sprint.tasks.length > 0 || !searchQuery.trim())
+  
+  const filteredPlannedSprints = plannedSprints.map(sprint => ({
+    ...sprint,
+    tasks: sprint.tasks.filter(task => matchesSearch(task, searchQuery))
+  })).filter(sprint => sprint.tasks.length > 0 || !searchQuery.trim())
+  
+  const filteredBacklogTasks = backlogTasks.filter(task => matchesSearch(task, searchQuery))
+  
+  // Calculate total tasks (for display)
+  const totalTasks = visibleSprints.reduce((sum, s) => sum + s.tasks.length, 0) + backlogTasks.length
+  const filteredTotalTasks = filteredActiveSprints.reduce((sum, s) => sum + s.tasks.length, 0) + 
+                             filteredPlannedSprints.reduce((sum, s) => sum + s.tasks.length, 0) + 
+                             filteredBacklogTasks.length
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -629,7 +672,16 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
               <div>
                 <h1 className="text-2xl font-bold">Backlog</h1>
                 <p className="text-sm text-muted-foreground">
-                  {totalTasks} tasks across {visibleSprints.length} sprints + backlog
+                  {searchQuery.trim() ? (
+                    <>
+                      {filteredTotalTasks} of {totalTasks} tasks
+                      {filteredTotalTasks !== totalTasks && ' matching search'}
+                    </>
+                  ) : (
+                    <>
+                      {totalTasks} tasks across {visibleSprints.length} sprints + backlog
+                    </>
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -684,6 +736,38 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                 >
                   + New Sprint
                 </Button>
+              </div>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="mt-4">
+              <div className="relative max-w-md">
+                <Input
+                  type="text"
+                  placeholder="Search tasks by title, key, or tags..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4"
+                />
+                <svg 
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground"
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    type="button"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           </div>
