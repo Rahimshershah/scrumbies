@@ -55,10 +55,16 @@ function SortableTaskRow({
   task, 
   onClick,
   canEdit,
+  isSelected,
+  onSelect,
+  index,
 }: { 
   task: Task
   onClick: () => void
   canEdit: boolean
+  isSelected: boolean
+  onSelect: (e: React.MouseEvent, index: number) => void
+  index: number
 }) {
   const { getStatusConfig, getTeamConfig } = useProjectSettings()
   const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
@@ -95,11 +101,20 @@ function SortableTaskRow({
       ref={setNodeRef}
       style={style}
       {...(canEdit ? { ...attributes, ...listeners } : {})}
+      onClick={(e) => {
+        if (e.shiftKey && canEdit) {
+          e.stopPropagation()
+          onSelect(e, index)
+        } else if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          onClick()
+        }
+      }}
       className={cn(
         "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
         getRowHeightClass(),
         canEdit && "active:cursor-grabbing",
-        isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing"
+        isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing",
+        isSelected && "bg-primary/10 border-primary/20"
       )}
     >
       {/* Drag handle indicator */}
@@ -217,6 +232,8 @@ export function SprintView({
 }: SprintViewProps) {
   const { statuses, getStatusConfig } = useProjectSettings()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
   const [showAddTask, setShowAddTask] = useState(false)
   const [localSprint, setLocalSprint] = useState(sprint)
@@ -326,20 +343,61 @@ export function SprintView({
     setActiveTask(task || null)
   }, [localSprint.tasks])
 
+  const handleTaskSelect = useCallback((e: React.MouseEvent, index: number) => {
+    e.stopPropagation()
+    if (e.shiftKey && lastSelectedIndex !== null) {
+      // Range selection
+      const start = Math.min(lastSelectedIndex, index)
+      const end = Math.max(lastSelectedIndex, index)
+      const newSelection = new Set(selectedTaskIds)
+      for (let i = start; i <= end; i++) {
+        newSelection.add(filteredTasks[i].id)
+      }
+      setSelectedTaskIds(newSelection)
+    } else {
+      // Single selection
+      const taskId = filteredTasks[index].id
+      const newSelection = new Set(selectedTaskIds)
+      if (newSelection.has(taskId)) {
+        newSelection.delete(taskId)
+      } else {
+        newSelection.add(taskId)
+      }
+      setSelectedTaskIds(newSelection)
+      setLastSelectedIndex(index)
+    }
+  }, [filteredTasks, lastSelectedIndex, selectedTaskIds])
+
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event
     setActiveTask(null)
 
     if (!over || active.id === over.id) return
 
-    const oldIndex = localSprint.tasks.findIndex(t => t.id === active.id)
-    const newIndex = localSprint.tasks.findIndex(t => t.id === over.id)
+    const activeId = active.id as string
+    const overId = over.id as string
 
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+    // Check if we're moving multiple selected tasks
+    const tasksToMove = selectedTaskIds.size > 0 && selectedTaskIds.has(activeId)
+      ? filteredTasks.filter(t => selectedTaskIds.has(t.id))
+      : [filteredTasks.find(t => t.id === activeId)].filter(Boolean) as Task[]
+
+    if (tasksToMove.length === 0) return
+
+    const targetIndex = filteredTasks.findIndex(t => t.id === overId)
+    if (targetIndex === -1) return
 
     // Save original order for potential revert
     const originalTasks = [...localSprint.tasks]
-    const newTasks = arrayMove(localSprint.tasks, oldIndex, newIndex)
+    
+    // Calculate new positions for all tasks being moved
+    const tasksToMoveIds = new Set(tasksToMove.map(t => t.id))
+    const remainingTasks = filteredTasks.filter(t => !tasksToMoveIds.has(t.id))
+    const newTasks = [
+      ...remainingTasks.slice(0, targetIndex),
+      ...tasksToMove,
+      ...remainingTasks.slice(targetIndex)
+    ]
     
     // Update local state immediately (optimistic update)
     setLocalSprint(prev => ({
@@ -349,20 +407,25 @@ export function SprintView({
 
     // Persist the new order automatically
     try {
-      const taskId = active.id as string
-      const response = await fetch('/api/tasks/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: taskId,
-          targetSprintId: localSprint.id,
-          newOrder: newIndex,
-        }),
+      // Move all selected tasks
+      const movePromises = tasksToMove.map((task, idx) => {
+        const newOrder = targetIndex + idx
+        return fetch('/api/tasks/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: task.id,
+            targetSprintId: localSprint.id,
+            newOrder: newOrder,
+          }),
+        })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to save order')
-      }
+      await Promise.all(movePromises)
+      
+      // Clear selection after successful move
+      setSelectedTaskIds(new Set())
+      setLastSelectedIndex(null)
     } catch (error) {
       console.error('Failed to reorder tasks:', error)
       // Revert on error
@@ -371,7 +434,7 @@ export function SprintView({
         tasks: originalTasks,
       }))
     }
-  }, [localSprint])
+  }, [localSprint, filteredTasks, selectedTaskIds])
 
   const statusBadgeConfig: Record<string, { label: string; color: string }> = {
     ACTIVE: { label: 'Active', color: 'bg-green-500 text-white' },
@@ -581,12 +644,19 @@ export function SprintView({
                 </div>
               ) : (
                 <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                  {filteredTasks.map((task) => (
+                  {filteredTasks.map((task, index) => (
                     <SortableTaskRow
                       key={task.id}
                       task={task}
-                      onClick={() => setSelectedTask(task)}
+                      onClick={() => {
+                        if (!selectedTaskIds.has(task.id)) {
+                          setSelectedTask(task)
+                        }
+                      }}
                       canEdit={canEdit}
+                      isSelected={selectedTaskIds.has(task.id)}
+                      onSelect={handleTaskSelect}
+                      index={index}
                     />
                   ))}
                 </SortableContext>

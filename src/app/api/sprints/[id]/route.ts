@@ -4,13 +4,14 @@ import { requireAuth } from '@/lib/auth-utils'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAuth()
+    const { id } = await params
 
     const sprint = await prisma.sprint.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         tasks: {
           orderBy: { order: 'asc' },
@@ -42,10 +43,11 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth()
+    const { id } = await params
 
     const body = await request.json()
     const { name, startDate, endDate, status, order } = body
@@ -53,7 +55,7 @@ export async function PATCH(
     // Check if trying to reactivate a completed sprint - admin only
     if (status && status !== 'COMPLETED') {
       const existingSprint = await prisma.sprint.findUnique({
-        where: { id: params.id },
+        where: { id },
         select: { status: true },
       })
       
@@ -66,7 +68,7 @@ export async function PATCH(
     }
 
     const sprint = await prisma.sprint.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(name !== undefined && { name }),
         ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
@@ -92,13 +94,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAuth()
+    const { id } = await params
 
     await prisma.sprint.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
