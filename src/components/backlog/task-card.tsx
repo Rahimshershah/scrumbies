@@ -29,9 +29,10 @@ interface TaskCardProps {
   users?: { id: string; name: string; avatarUrl?: string | null }[]
   onClick: () => void
   onUpdate?: (task: Task) => void
+  isActive?: boolean
 }
 
-export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps) {
+export function TaskCard({ task, users = [], onClick, onUpdate, isActive = false }: TaskCardProps) {
   const { statuses, getStatusConfig, getTeamConfig } = useProjectSettings()
   const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
@@ -120,7 +121,8 @@ export function TaskCard({ task, users = [], onClick, onUpdate }: TaskCardProps)
       className={cn(
         "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
         getRowHeightClass(),
-        isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing"
+        isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing",
+        isActive && "bg-primary/15 border-l-4 border-l-primary ring-2 ring-primary/40"
       )}
     >
       {/* Drag handle indicator */}

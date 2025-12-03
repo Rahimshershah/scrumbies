@@ -16,6 +16,7 @@ interface BacklogSectionProps {
   onTaskClick: (task: Task) => void
   onCreateTask: (task: Task) => void
   onTaskUpdate?: (task: Task) => void
+  selectedTaskId?: string | null
 }
 
 export function BacklogSection({
@@ -25,6 +26,7 @@ export function BacklogSection({
   onTaskClick,
   onCreateTask,
   onTaskUpdate,
+  selectedTaskId,
 }: BacklogSectionProps) {
   const [isAddingTask, setIsAddingTask] = useState(false)
 
@@ -56,6 +58,7 @@ export function BacklogSection({
             users={users}
             onClick={() => onTaskClick(task)}
             onUpdate={onTaskUpdate}
+            isActive={selectedTaskId === task.id}
           />
         ))}
       </SortableContext>

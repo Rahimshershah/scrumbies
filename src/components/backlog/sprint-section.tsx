@@ -32,6 +32,7 @@ interface SprintSectionProps {
   onSprintComplete?: (completedSprint: Sprint, newTasks?: Task[]) => void
   onOpenInDedicatedView?: (sprint: Sprint) => void
   variant?: 'active' | 'planned'
+  selectedTaskId?: string | null
 }
 
 function formatDate(dateString: string | null | undefined) {
@@ -48,6 +49,7 @@ export function SprintSection({
   onTaskClick,
   onCreateTask,
   onTaskUpdate,
+  selectedTaskId,
   onStatusChange,
   onSprintUpdate,
   onSprintComplete,
@@ -267,6 +269,7 @@ export function SprintSection({
                 users={users}
                 onClick={() => onTaskClick(task)}
                 onUpdate={onTaskUpdate}
+                isActive={selectedTaskId === task.id}
               />
             ))}
           </SortableContext>

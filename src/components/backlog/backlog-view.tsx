@@ -888,6 +888,7 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                     onTaskClick={handleTaskClick}
                     onCreateTask={handleCreateTask}
                     onTaskUpdate={handleTaskUpdate}
+                    selectedTaskId={selectedTask?.id}
                     onStatusChange={handleSprintStatusChange}
                     onSprintUpdate={handleSprintUpdate}
                     onSprintComplete={(completedSprint) => {
@@ -923,6 +924,7 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                     onTaskClick={handleTaskClick}
                     onCreateTask={handleCreateTask}
                     onTaskUpdate={handleTaskUpdate}
+                    selectedTaskId={selectedTask?.id}
                     onStatusChange={handleSprintStatusChange}
                     onSprintUpdate={handleSprintUpdate}
                     onOpenInDedicatedView={setViewingSprint}
@@ -950,6 +952,7 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                   onTaskClick={handleTaskClick}
                   onCreateTask={handleCreateTask}
                   onTaskUpdate={handleTaskUpdate}
+                  selectedTaskId={selectedTask?.id}
                 />
               </div>
             )}

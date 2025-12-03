@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TaskDetailSidebar } from './task-detail-sidebar'
 import { InlineTaskInput } from './inline-task-input'
+import { KanbanView } from './kanban-view'
 import { cn } from '@/lib/utils'
 import { useProjectSettings } from '@/contexts/project-settings-context'
 import { useRowHeight } from '@/contexts/row-height-context'
@@ -56,6 +57,7 @@ function SortableTaskRow({
   onClick,
   canEdit,
   isSelected,
+  isActive,
   onSelect,
   index,
 }: { 
@@ -63,6 +65,7 @@ function SortableTaskRow({
   onClick: () => void
   canEdit: boolean
   isSelected: boolean
+  isActive: boolean
   onSelect: (e: React.MouseEvent, index: number) => void
   index: number
 }) {
@@ -119,7 +122,8 @@ function SortableTaskRow({
         getRowHeightClass(),
         canEdit && "active:cursor-grabbing",
         isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing",
-        isSelected && "bg-primary/10 border-primary/20 ring-1 ring-primary/30"
+        isSelected && "bg-primary/10 border-primary/20 ring-1 ring-primary/30",
+        isActive && "bg-primary/15 border-l-4 border-l-primary ring-2 ring-primary/40"
       )}
     >
       {/* Drag handle indicator */}
@@ -243,6 +247,7 @@ export function SprintView({
   const [showAddTask, setShowAddTask] = useState(false)
   const [localSprint, setLocalSprint] = useState(sprint)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
 
   // Update local sprint when prop changes
   useEffect(() => {
@@ -593,9 +598,46 @@ export function SprintView({
             </div>
           </div>
 
-          {/* Filter Tabs & Add Task */}
-          <div className="flex items-center justify-between mb-4 border-b pb-3">
-            <div className="flex items-center gap-1 flex-wrap">
+          {/* View Selector */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">View:</span>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="h-8 text-xs"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Table
+              </Button>
+              <Button
+                variant={viewMode === 'kanban' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('kanban')}
+                className="h-8 text-xs"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+                Kanban
+              </Button>
+            </div>
+            {canEdit && (
+              <Button size="sm" onClick={() => setShowAddTask(true)}>
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Task
+              </Button>
+            )}
+          </div>
+
+          {/* Filter Tabs (only show in table view) */}
+          {viewMode === 'table' && (
+            <div className="flex items-center gap-1 flex-wrap mb-4 border-b pb-3">
               <span className="text-sm text-muted-foreground mr-2">Filter:</span>
               <Button
                 variant={filterStatus === 'ALL' ? "default" : "ghost"}
@@ -621,15 +663,7 @@ export function SprintView({
                 </Button>
               ))}
             </div>
-            {canEdit && (
-              <Button size="sm" onClick={() => setShowAddTask(true)}>
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Task
-              </Button>
-            )}
-          </div>
+          )}
 
           {/* Add Task Input */}
           {showAddTask && (
@@ -644,47 +678,89 @@ export function SprintView({
             </div>
           )}
 
-          {/* Task List with Drag & Drop */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="border rounded-lg overflow-hidden">
-              {filteredTasks.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">
-                  {totalTasks === 0 ? 'No tasks in this sprint yet' : 'No tasks match the selected filter'}
-                </div>
-              ) : (
-                <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                  {filteredTasks.map((task, index) => (
-                    <SortableTaskRow
-                      key={task.id}
-                      task={task}
-                      onClick={() => {
-                        if (!selectedTaskIds.has(task.id)) {
-                          setSelectedTask(task)
-                        }
-                      }}
-                      canEdit={canEdit}
-                      isSelected={selectedTaskIds.has(task.id)}
-                      onSelect={handleTaskSelect}
-                      index={index}
-                    />
-                  ))}
-                </SortableContext>
-              )}
-            </div>
+          {/* Task View */}
+          {viewMode === 'table' ? (
+            /* Table View with Drag & Drop */
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="border rounded-lg overflow-hidden">
+                {filteredTasks.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    {totalTasks === 0 ? 'No tasks in this sprint yet' : 'No tasks match the selected filter'}
+                  </div>
+                ) : (
+                  <SortableContext items={filteredTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                    {filteredTasks.map((task, index) => (
+                      <SortableTaskRow
+                        key={task.id}
+                        task={task}
+                        onClick={() => {
+                          if (!selectedTaskIds.has(task.id)) {
+                            setSelectedTask(task)
+                          }
+                        }}
+                        canEdit={canEdit}
+                        isSelected={selectedTaskIds.has(task.id)}
+                        isActive={selectedTask?.id === task.id}
+                        onSelect={handleTaskSelect}
+                        index={index}
+                      />
+                    ))}
+                  </SortableContext>
+                )}
+              </div>
 
-            <DragOverlay>
-              {activeTask && (
-                <div className="bg-background shadow-lg rounded-md border px-3 py-2 text-sm">
-                  {activeTask.title}
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {activeTask && (
+                  <div className="bg-background shadow-lg rounded-md border px-3 py-2 text-sm">
+                    {activeTask.title}
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            /* Kanban View */
+            <div className="h-[calc(100vh-550px)] min-h-[600px]">
+              <KanbanView
+                tasks={localSprint.tasks}
+                users={users}
+                onTaskClick={(task) => {
+                  if (!selectedTaskIds.has(task.id)) {
+                    setSelectedTask(task)
+                  }
+                }}
+                onTaskStatusChange={async (taskId, newStatus) => {
+                  try {
+                    const response = await fetch(`/api/tasks/${taskId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: newStatus }),
+                    })
+                    
+                    if (response.ok) {
+                      const updatedTask = await response.json()
+                      // Update task without opening detail panel
+                      setLocalSprint(prev => ({
+                        ...prev,
+                        tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
+                      }))
+                      onTaskUpdate?.(updatedTask)
+                    } else {
+                      console.error('Failed to update task status')
+                    }
+                  } catch (error) {
+                    console.error('Error updating task status:', error)
+                  }
+                }}
+                canEdit={canEdit}
+                selectedTaskId={selectedTask?.id}
+              />
+            </div>
+          )}
         </div>
       </ScrollArea>
       </div>
