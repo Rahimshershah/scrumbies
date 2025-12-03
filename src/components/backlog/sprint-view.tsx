@@ -123,7 +123,7 @@ function SortableTaskRow({
         canEdit && "active:cursor-grabbing",
         isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing",
         isSelected && "bg-primary/10 border-primary/20 ring-1 ring-primary/30",
-        isActive && "bg-primary/15 border-l-4 border-l-primary ring-2 ring-primary/40"
+        isActive && "bg-blue-50 dark:bg-blue-950/20"
       )}
     >
       {/* Drag handle indicator */}

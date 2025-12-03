@@ -174,7 +174,7 @@ function KanbanCard({
         "bg-background border rounded-lg p-3 shadow-sm hover:shadow-md transition-all",
         isDragging && "opacity-50 shadow-lg rotate-2",
         canEdit && "active:cursor-grabbing cursor-grab",
-        isActive && "bg-primary/15 border-primary border-2 ring-2 ring-primary/40"
+        isActive && "bg-blue-50 dark:bg-blue-950/20"
       )}
     >
       {/* Task Key and Tags */}

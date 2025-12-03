@@ -122,7 +122,7 @@ export function TaskCard({ task, users = [], onClick, onUpdate, isActive = false
         "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
         getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing",
-        isActive && "bg-primary/15 border-l-4 border-l-primary ring-2 ring-primary/40"
+        isActive && "bg-blue-50 dark:bg-blue-950/20"
       )}
     >
       {/* Drag handle indicator */}
