@@ -269,6 +269,8 @@ export function AppShell({
           <AppLayout
             currentView="reports"
             onViewChange={handleViewChange}
+            completedSprints={sprints.filter(s => s.status === 'COMPLETED')}
+            onSprintSelect={() => {}}
           >
             <ReportsView
               projectId={effectiveProjectId}
