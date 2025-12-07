@@ -494,7 +494,8 @@ export function TaskDetailSidebar({
     priority !== (task.priority || 'MEDIUM') ||
     team !== (task.team || 'none') ||
     assigneeId !== (task.assigneeId || 'unassigned') ||
-    sprintId !== (task.sprintId || 'backlog')
+    sprintId !== (task.sprintId || 'backlog') ||
+    epicId !== (task.epicId || 'none')
 
   const hasChain = taskChain && taskChain.totalTasks > 1
   const assignee = users.find(u => u.id === assigneeId)
