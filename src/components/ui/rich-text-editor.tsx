@@ -15,7 +15,7 @@ import { TaskItem } from '@tiptap/extension-task-item'
 import Mention from '@tiptap/extension-mention'
 import { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
-import { cn } from '@/lib/utils'
+import { cn, normalizeAvatarUrl } from '@/lib/utils'
 import { Button } from './button'
 import { useCallback, useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 
@@ -98,7 +98,7 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(({ items, comma
         >
           <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary overflow-hidden">
             {item.avatarUrl ? (
-              <img src={item.avatarUrl} alt="" className="w-full h-full object-cover" />
+              <img src={normalizeAvatarUrl(item.avatarUrl) || undefined} alt="" className="w-full h-full object-cover" />
             ) : (
               item.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
             )}

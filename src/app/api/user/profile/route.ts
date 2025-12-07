@@ -5,6 +5,7 @@ import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import bcrypt from 'bcryptjs'
+import { getUploadsDir } from '@/lib/utils'
 
 // GET - Get current user profile
 export async function GET() {
@@ -120,16 +121,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'avatars')
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
+    // Use persistent storage location that works in both dev and standalone mode
+    const baseUploadsDir = getUploadsDir()
+    const avatarsDir = join(baseUploadsDir, 'avatars')
+    if (!existsSync(avatarsDir)) {
+      await mkdir(avatarsDir, { recursive: true })
     }
 
     // Generate unique filename
     const timestamp = Date.now()
     const ext = file.name.split('.').pop() || 'jpg'
     const uniqueFilename = `${user.id}-${timestamp}.${ext}`
-    const filePath = join(uploadsDir, uniqueFilename)
+    const filePath = join(avatarsDir, uniqueFilename)
 
     // Write file to disk
     const bytes = await file.arrayBuffer()
