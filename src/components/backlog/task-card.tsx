@@ -282,14 +282,14 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         )}
       </div>
 
-      {/* Epic dropdown - between title and status */}
-      <div className="w-28 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* Epic dropdown - positioned more centrally with spacing */}
+      <div className="w-32 flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full text-left hover:opacity-80 transition-opacity">
               {task.epic ? (
                 <Badge 
-                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer truncate max-w-full")}
+                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer truncate max-w-full")}
                   style={{ 
                     backgroundColor: `${task.epic.color}20`, 
                     color: task.epic.color,
@@ -300,11 +300,13 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
                   {task.epic.name}
                 </Badge>
               ) : (
-                <span className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer")}>—</span>
+                <Badge variant="outline" className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer px-2.5 py-1 border-dashed")}>
+                  No Epic
+                </Badge>
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuContent align="center" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuLabel className={getTextSize('xs')}>Set Epic</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -233,14 +233,14 @@ function SortableTaskRow({
         )}
       </div>
 
-      {/* Epic - Inline Dropdown */}
-      <div className="w-28 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* Epic - Inline Dropdown - positioned more centrally */}
+      <div className="w-32 flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full text-left hover:opacity-80 transition-opacity">
               {task.epic ? (
                 <Badge 
-                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer truncate max-w-full")}
+                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer truncate max-w-full")}
                   style={{ 
                     backgroundColor: `${task.epic.color}20`, 
                     color: task.epic.color,
@@ -251,11 +251,13 @@ function SortableTaskRow({
                   {task.epic.name}
                 </Badge>
               ) : (
-                <span className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer")}>—</span>
+                <Badge variant="outline" className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer px-2.5 py-1 border-dashed")}>
+                  No Epic
+                </Badge>
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="center" className="w-48">
             <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'epicId', null)}>
               <span className="text-muted-foreground">No Epic</span>
             </DropdownMenuItem>

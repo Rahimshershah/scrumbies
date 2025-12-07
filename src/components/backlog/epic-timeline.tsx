@@ -157,17 +157,25 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
   }
 
   // Calculate position and width for a date range
-  const getBarStyle = (start: string | null | undefined, end: string | null | undefined) => {
+  const getBarStyle = (start: string | null | undefined, end: string | null | undefined, minWidthPercent = 2) => {
     if (!start) return null
 
     const totalMs = endDate.getTime() - startDate.getTime()
+    if (totalMs === 0) return null
+    
     const startMs = new Date(start).getTime() - startDate.getTime()
     const endMs = end ? new Date(end).getTime() - startDate.getTime() : startMs + 14 * 24 * 60 * 60 * 1000 // Default 2 weeks
 
     const left = Math.max(0, (startMs / totalMs) * 100)
     const width = Math.min(100 - left, ((endMs - startMs) / totalMs) * 100)
 
-    return { left: `${left}%`, width: `${Math.max(2, width)}%` }
+    return { left: `${left}%`, width: `${Math.max(minWidthPercent, width)}%` }
+  }
+
+  // Get task bar style based on its sprint dates
+  const getTaskBarStyle = (task: any) => {
+    if (!task.sprint?.startDate || !task.sprint?.endDate) return null
+    return getBarStyle(task.sprint.startDate, task.sprint.endDate, 5)
   }
 
   // Group tasks by status
@@ -280,10 +288,11 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
               const barStyle = getBarStyle(epicDates.start, epicDates.end)
 
               return (
-                <div key={epic.id} className="border-b hover:bg-muted/30">
-                  <div className="flex">
+                <div key={epic.id} className="border-b">
+                  {/* Epic Row */}
+                  <div className="flex bg-muted/20">
                     {/* Epic info */}
-                    <div className="w-64 flex-shrink-0 p-3 border-r">
+                    <div className="w-64 flex-shrink-0 p-3 border-r bg-muted/30">
                       <button
                         onClick={() => onEpicClick(epic.id)}
                         className="text-left w-full"
@@ -293,7 +302,7 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                             className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: epic.color }}
                           />
-                          <span className="font-medium truncate">{epic.name}</span>
+                          <span className="font-semibold truncate">{epic.name}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{stats.total} tasks</span>
@@ -310,8 +319,8 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                       </button>
                     </div>
 
-                    {/* Timeline bar */}
-                    <div className="flex-1 relative h-20">
+                    {/* Epic Timeline bar */}
+                    <div className="flex-1 relative h-16">
                       {/* Week grid lines */}
                       <div className="absolute inset-0 flex">
                         {weeks.map((week, i) => (
@@ -324,20 +333,21 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                         ))}
                       </div>
 
-                      {/* Epic bar */}
+                      {/* Epic bar - main bar showing the epic's date range */}
                       {barStyle && (
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div
-                                className="absolute top-4 h-8 rounded-md cursor-pointer hover:opacity-80 transition-opacity flex items-center px-2 text-white text-xs font-medium truncate"
+                                className="absolute top-3 h-10 rounded-md cursor-pointer hover:opacity-90 transition-opacity flex items-center px-3 text-white text-sm font-medium shadow-sm"
                                 style={{
                                   ...barStyle,
                                   backgroundColor: epic.color,
+                                  minWidth: '120px',
                                 }}
                                 onClick={() => onEpicClick(epic.id)}
                               >
-                                {epic.name}
+                                <span className="truncate">{epic.name}</span>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -356,48 +366,139 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                           </Tooltip>
                         </TooltipProvider>
                       )}
-
-                      {/* Tasks */}
-                      <div className="absolute bottom-2 left-0 right-0 px-2">
-                        <div className="flex gap-1 overflow-hidden">
-                          {(epic.tasks || []).slice(0, 8).map((task) => (
-                            <TooltipProvider key={task.id}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    onClick={() => onTaskClick(task)}
-                                    className={`w-5 h-5 rounded text-[10px] font-medium flex items-center justify-center ${
-                                      task.status === 'DONE' || task.status === 'LIVE'
-                                        ? 'bg-green-500 text-white'
-                                        : task.status === 'IN_PROGRESS'
-                                        ? 'bg-blue-500 text-white'
-                                        : task.status === 'BLOCKED'
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-muted text-muted-foreground'
-                                    }`}
-                                  >
-                                    {task.taskKey?.split('-')[1] || '?'}
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="text-sm">
-                                    <div className="font-medium">{task.taskKey}</div>
-                                    <div>{task.title}</div>
-                                    <div className="text-muted-foreground">{task.status}</div>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ))}
-                          {(epic.tasks || []).length > 8 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              +{epic.tasks.length - 8}
-                            </span>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   </div>
+
+                  {/* Tasks in Epic - each task positioned based on its sprint dates */}
+                  {(epic.tasks || []).length > 0 && (
+                    <div className="flex">
+                      {/* Task list sidebar */}
+                      <div className="w-64 flex-shrink-0 border-r bg-background">
+                        {(epic.tasks || []).map((task: any) => (
+                          <button
+                            key={task.id}
+                            onClick={() => onTaskClick(task)}
+                            className="w-full text-left px-3 py-2 border-b hover:bg-muted/50 flex items-center gap-2"
+                          >
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              task.status === 'DONE' || task.status === 'LIVE'
+                                ? 'bg-green-500'
+                                : task.status === 'IN_PROGRESS'
+                                ? 'bg-blue-500'
+                                : task.status === 'BLOCKED'
+                                ? 'bg-red-500'
+                                : 'bg-gray-400'
+                            }`} />
+                            <span className="text-xs font-mono text-primary/70 flex-shrink-0">{task.taskKey}</span>
+                            <span className="text-sm truncate flex-1">{task.title}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Task timeline bars */}
+                      <div className="flex-1">
+                        {(epic.tasks || []).map((task: any) => {
+                          const taskBarStyle = getTaskBarStyle(task)
+                          
+                          return (
+                            <div key={task.id} className="relative h-10 border-b">
+                              {/* Week grid lines */}
+                              <div className="absolute inset-0 flex">
+                                {weeks.map((week, i) => (
+                                  <div
+                                    key={i}
+                                    className={`flex-1 min-w-[100px] border-r ${
+                                      isCurrentWeek(week) ? 'bg-primary/5' : ''
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+
+                              {/* Task bar */}
+                              {taskBarStyle ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div
+                                        className={`absolute top-1.5 h-7 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center px-2 text-white text-xs font-medium shadow-sm ${
+                                          task.status === 'DONE' || task.status === 'LIVE'
+                                            ? 'bg-green-500'
+                                            : task.status === 'IN_PROGRESS'
+                                            ? 'bg-blue-500'
+                                            : task.status === 'BLOCKED'
+                                            ? 'bg-red-500'
+                                            : 'bg-gray-500'
+                                        }`}
+                                        style={{
+                                          ...taskBarStyle,
+                                          minWidth: '80px',
+                                        }}
+                                        onClick={() => onTaskClick(task)}
+                                      >
+                                        <span className="truncate">{task.taskKey} - {task.title}</span>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-sm max-w-xs">
+                                        <div className="font-medium">{task.taskKey}</div>
+                                        <div>{task.title}</div>
+                                        <div className="text-muted-foreground mt-1">
+                                          Status: {task.status.replace('_', ' ')}
+                                        </div>
+                                        {task.sprint && (
+                                          <div className="text-muted-foreground">
+                                            Sprint: {task.sprint.name}
+                                          </div>
+                                        )}
+                                        {task.sprint?.startDate && task.sprint?.endDate && (
+                                          <div className="text-muted-foreground">
+                                            {formatDate(new Date(task.sprint.startDate))} - {formatDate(new Date(task.sprint.endDate))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div
+                                        className={`absolute left-2 top-1.5 h-7 px-2 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center text-white text-xs font-medium shadow-sm ${
+                                          task.status === 'DONE' || task.status === 'LIVE'
+                                            ? 'bg-green-500'
+                                            : task.status === 'IN_PROGRESS'
+                                            ? 'bg-blue-500'
+                                            : task.status === 'BLOCKED'
+                                            ? 'bg-red-500'
+                                            : 'bg-gray-500'
+                                        }`}
+                                        onClick={() => onTaskClick(task)}
+                                      >
+                                        <span className="truncate">{task.taskKey} - No sprint dates</span>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-sm max-w-xs">
+                                        <div className="font-medium">{task.taskKey}</div>
+                                        <div>{task.title}</div>
+                                        <div className="text-muted-foreground mt-1">
+                                          Status: {task.status.replace('_', ' ')}
+                                        </div>
+                                        <div className="text-amber-600 mt-1">
+                                          No sprint dates set
+                                        </div>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
