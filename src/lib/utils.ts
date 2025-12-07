@@ -7,6 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Get the uploads directory path that works in both dev and standalone mode
+// This function should only be used in server-side code (API routes)
 export function getUploadsDir(): string {
   // Use environment variable if set (for production)
   if (process.env.UPLOADS_DIR) {
@@ -17,20 +18,25 @@ export function getUploadsDir(): string {
   
   // In standalone mode, process.cwd() is typically .next/standalone
   // Check if we're in standalone mode by looking for server.js
-  // Use dynamic import to avoid issues
+  // Use dynamic require to avoid build-time issues
+  let isStandalone = false
   try {
-    const fs = require('fs')
-    const isStandalone = fs.existsSync(join(cwd, 'server.js'))
-    
-    if (isStandalone) {
-      // In standalone mode, store uploads in a persistent location
-      // Try to go up to the project root (where public folder might be)
-      // Or use a fixed path like /var/www/scrumbies/uploads
-      // For now, use a relative path that should work
-      return join(cwd, '..', 'uploads')
+    // Only check in Node.js environment (server-side)
+    if (typeof window === 'undefined') {
+      const fs = require('fs')
+      isStandalone = fs.existsSync(join(cwd, 'server.js'))
     }
   } catch (e) {
     // If we can't check, assume dev mode
+    isStandalone = false
+  }
+  
+  if (isStandalone) {
+    // In standalone mode, store uploads in a persistent location
+    // Try to go up to the project root (where public folder might be)
+    // Or use a fixed path like /var/www/scrumbies/uploads
+    // For now, use a relative path that should work
+    return join(cwd, '..', 'uploads')
   }
   
   // In dev mode, use public/uploads
