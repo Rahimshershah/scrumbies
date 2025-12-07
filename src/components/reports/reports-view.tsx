@@ -102,19 +102,33 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
       if (res.ok) {
         const html = await res.text()
-        const blob = new Blob([html], { type: 'text/html' })
-        const url = URL.createObjectURL(blob)
-        const printWindow = window.open(url, '_blank')
         
-        if (printWindow) {
-          printWindow.addEventListener('load', () => {
-            setTimeout(() => {
-              printWindow.print()
-            }, 300)
-          })
+        // Dynamically import html2pdf
+        const html2pdf = (await import('html2pdf.js')).default
+        
+        // Create a temporary container
+        const container = document.createElement('div')
+        container.innerHTML = html
+        container.style.position = 'absolute'
+        container.style.left = '-9999px'
+        document.body.appendChild(container)
+        
+        // Find the body content
+        const content = container.querySelector('body') || container
+        
+        // Generate PDF
+        const opt = {
+          margin: 10,
+          filename: `sprint-report-${new Date().toISOString().split('T')[0]}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         }
         
-        setTimeout(() => URL.revokeObjectURL(url), 60000)
+        await html2pdf().set(opt).from(content).save()
+        
+        // Cleanup
+        document.body.removeChild(container)
       }
     } catch (error) {
       console.error('Failed to download PDF:', error)
