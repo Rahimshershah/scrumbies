@@ -23,6 +23,13 @@ export async function GET(request: NextRequest) {
                 avatarUrl: true,
               },
             },
+            epic: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
             splitFrom: {
               select: {
                 id: true,

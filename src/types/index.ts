@@ -25,6 +25,8 @@ export interface Task {
   team?: Team | null
   sprintId?: string | null
   sprint?: { id: string; name: string } | null
+  epicId?: string | null
+  epic?: { id: string; name: string; color: string } | null
   assignee?: User | null
   assigneeId?: string | null
   assignedAt?: string | null
@@ -116,5 +118,23 @@ export interface Project {
     sprints: number
     tasks: number
     members: number
+    epics: number
   }
+}
+
+export interface Epic {
+  id: string
+  name: string
+  description?: string | null
+  color: string
+  startDate?: string | null
+  endDate?: string | null
+  order: number
+  projectId: string
+  createdById: string
+  createdBy?: User
+  tasks?: Task[]
+  _count?: { tasks: number }
+  createdAt?: string
+  updatedAt?: string
 }

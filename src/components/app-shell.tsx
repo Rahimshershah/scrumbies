@@ -8,7 +8,7 @@ import { SpacesView } from '@/components/spaces'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
 import { RowHeightProvider } from '@/contexts/row-height-context'
-import { Project, Sprint, Task } from '@/types'
+import { Project, Sprint, Task, Epic } from '@/types'
 
 export type AppView = 'backlog' | 'spaces'
 
@@ -44,6 +44,7 @@ export function AppShell({
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId)
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
+  const [epics, setEpics] = useState<Epic[]>([])
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [currentView, setCurrentView] = useState<AppView>('backlog')
@@ -99,9 +100,10 @@ export function AppShell({
   const fetchProjectData = useCallback(async (projectId: string) => {
     setLoading(true)
     try {
-      const [sprintsRes, backlogRes] = await Promise.all([
+      const [sprintsRes, backlogRes, epicsRes] = await Promise.all([
         fetch(`/api/sprints?projectId=${projectId}`),
         fetch(`/api/tasks?projectId=${projectId}&backlog=true`),
+        fetch(`/api/epics?projectId=${projectId}`),
       ])
 
       if (sprintsRes.ok && backlogRes.ok) {
@@ -109,6 +111,11 @@ export function AppShell({
         const backlogData = await backlogRes.json()
         setSprints(sprintsData)
         setBacklogTasks(backlogData)
+      }
+      
+      if (epicsRes.ok) {
+        const epicsData = await epicsRes.json()
+        setEpics(epicsData)
       }
     } catch (error) {
       console.error('Failed to fetch project data:', error)
@@ -137,6 +144,23 @@ export function AppShell({
       handleProjectChange(savedProjectId)
     }
   }, []) // Only run on mount
+
+  // Fetch epics on initial load for current project
+  useEffect(() => {
+    async function fetchEpics() {
+      if (!currentProjectId) return
+      try {
+        const res = await fetch(`/api/epics?projectId=${currentProjectId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setEpics(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch epics:', error)
+      }
+    }
+    fetchEpics()
+  }, [currentProjectId])
 
   // Handle new project creation from header
   const handleProjectCreated = useCallback((newProject: Project) => {
@@ -229,6 +253,7 @@ export function AppShell({
           <BacklogView
             initialSprints={sprints}
             initialBacklog={backlogTasks}
+            initialEpics={epics}
             users={users}
             currentUser={user}
             projectId={effectiveProjectId}

@@ -70,6 +70,13 @@ export async function GET(
             name: true,
           },
         },
+        epic: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
       },
     })
 
@@ -95,7 +102,7 @@ export async function PATCH(
     const { id } = await params
 
     const body = await request.json()
-    const { title, description, status, priority, assigneeId, team, sprintId, order } = body
+    const { title, description, status, priority, assigneeId, team, sprintId, epicId, order } = body
 
     // Get current task for activity tracking
     const currentTask = await prisma.task.findUnique({
@@ -185,6 +192,7 @@ export async function PATCH(
       })
     }
     if (order !== undefined) updateData.order = order
+    if (epicId !== undefined) updateData.epicId = epicId
 
     const task = await prisma.task.update({
       where: { id },
@@ -219,6 +227,13 @@ export async function PATCH(
           select: {
             id: true,
             name: true,
+          },
+        },
+        epic: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
           },
         },
         _count: {

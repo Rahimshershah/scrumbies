@@ -1,0 +1,494 @@
+'use client'
+
+import { useState, useEffect, useMemo } from 'react'
+import { Epic, Task, Sprint } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
+interface EpicTimelineProps {
+  epics: Epic[]
+  sprints: Sprint[]
+  onBack: () => void
+  onTaskClick: (task: Task) => void
+  onEpicClick: (epicId: string) => void
+}
+
+interface EpicWithTasks extends Epic {
+  tasks: Task[]
+}
+
+export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick }: EpicTimelineProps) {
+  const [loading, setLoading] = useState(true)
+  const [epicsWithTasks, setEpicsWithTasks] = useState<EpicWithTasks[]>([])
+  const [view, setView] = useState<'timeline' | 'list'>('timeline')
+
+  // Fetch epic details with tasks
+  useEffect(() => {
+    async function fetchEpicDetails() {
+      setLoading(true)
+      try {
+        const detailedEpics = await Promise.all(
+          epics.map(async (epic) => {
+            const res = await fetch(`/api/epics/${epic.id}`)
+            if (res.ok) {
+              return await res.json()
+            }
+            return { ...epic, tasks: [] }
+          })
+        )
+        setEpicsWithTasks(detailedEpics)
+      } catch (error) {
+        console.error('Failed to fetch epic details:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (epics.length > 0) {
+      fetchEpicDetails()
+    } else {
+      setLoading(false)
+      setEpicsWithTasks([])
+    }
+  }, [epics])
+
+  // Calculate timeline range
+  const { startDate, endDate, weeks } = useMemo(() => {
+    const now = new Date()
+    let minDate = now
+    let maxDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000) // 90 days from now
+
+    // Consider epic dates
+    epicsWithTasks.forEach((epic) => {
+      if (epic.startDate) {
+        const start = new Date(epic.startDate)
+        if (start < minDate) minDate = start
+      }
+      if (epic.endDate) {
+        const end = new Date(epic.endDate)
+        if (end > maxDate) maxDate = end
+      }
+    })
+
+    // Consider sprint dates
+    sprints.forEach((sprint) => {
+      if (sprint.startDate) {
+        const start = new Date(sprint.startDate)
+        if (start < minDate) minDate = start
+      }
+      if (sprint.endDate) {
+        const end = new Date(sprint.endDate)
+        if (end > maxDate) maxDate = end
+      }
+    })
+
+    // Align to week boundaries
+    const startOfWeek = new Date(minDate)
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+    startOfWeek.setHours(0, 0, 0, 0)
+
+    const endOfWeek = new Date(maxDate)
+    endOfWeek.setDate(endOfWeek.getDate() + (6 - endOfWeek.getDay()))
+    endOfWeek.setHours(23, 59, 59, 999)
+
+    // Generate weeks
+    const weeks: Date[] = []
+    const current = new Date(startOfWeek)
+    while (current <= endOfWeek) {
+      weeks.push(new Date(current))
+      current.setDate(current.getDate() + 7)
+    }
+
+    return { startDate: startOfWeek, endDate: endOfWeek, weeks }
+  }, [epicsWithTasks, sprints])
+
+  // Calculate position and width for a date range
+  const getBarStyle = (start: string | null | undefined, end: string | null | undefined) => {
+    if (!start) return null
+
+    const totalMs = endDate.getTime() - startDate.getTime()
+    const startMs = new Date(start).getTime() - startDate.getTime()
+    const endMs = end ? new Date(end).getTime() - startDate.getTime() : startMs + 14 * 24 * 60 * 60 * 1000 // Default 2 weeks
+
+    const left = Math.max(0, (startMs / totalMs) * 100)
+    const width = Math.min(100 - left, ((endMs - startMs) / totalMs) * 100)
+
+    return { left: `${left}%`, width: `${Math.max(2, width)}%` }
+  }
+
+  // Group tasks by status
+  const getTaskStats = (tasks: Task[]) => {
+    const done = tasks.filter(t => t.status === 'DONE' || t.status === 'LIVE').length
+    const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS').length
+    const total = tasks.length
+    const progress = total > 0 ? Math.round((done / total) * 100) : 0
+
+    return { done, inProgress, total, progress }
+  }
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  const isCurrentWeek = (weekStart: Date) => {
+    const now = new Date()
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 6)
+    return now >= weekStart && now <= weekEnd
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b flex items-center justify-between bg-background">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold">Epic Timeline</h1>
+            <p className="text-sm text-muted-foreground">
+              {epicsWithTasks.length} epic{epicsWithTasks.length !== 1 ? 's' : ''} • 
+              {formatDate(startDate)} - {formatDate(endDate)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border rounded-md p-0.5 bg-muted/30">
+            <Button
+              variant={view === 'timeline' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 px-3"
+              onClick={() => setView('timeline')}
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Timeline
+            </Button>
+            <Button
+              variant={view === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 px-3"
+              onClick={() => setView('list')}
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              List
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {view === 'timeline' ? (
+        <ScrollArea className="flex-1">
+          <div className="min-w-[1200px]">
+            {/* Week headers */}
+            <div className="sticky top-0 bg-background z-10 border-b">
+              <div className="flex">
+                <div className="w-64 flex-shrink-0 p-3 border-r font-medium text-sm text-muted-foreground">
+                  Epic
+                </div>
+                <div className="flex-1 flex">
+                  {weeks.map((week, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 min-w-[100px] p-2 text-center text-xs border-r ${
+                        isCurrentWeek(week) ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <div className="font-medium">{formatDate(week)}</div>
+                      {isCurrentWeek(week) && (
+                        <div className="text-primary text-[10px] font-semibold">This Week</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Epics */}
+            {epicsWithTasks.map((epic) => {
+              const stats = getTaskStats(epic.tasks || [])
+              const barStyle = getBarStyle(epic.startDate, epic.endDate)
+
+              return (
+                <div key={epic.id} className="border-b hover:bg-muted/30">
+                  <div className="flex">
+                    {/* Epic info */}
+                    <div className="w-64 flex-shrink-0 p-3 border-r">
+                      <button
+                        onClick={() => onEpicClick(epic.id)}
+                        className="text-left w-full"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: epic.color }}
+                          />
+                          <span className="font-medium truncate">{epic.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{stats.total} tasks</span>
+                          <span>•</span>
+                          <span>{stats.progress}% done</span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-green-500 rounded-full transition-all"
+                            style={{ width: `${stats.progress}%` }}
+                          />
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Timeline bar */}
+                    <div className="flex-1 relative h-20">
+                      {/* Week grid lines */}
+                      <div className="absolute inset-0 flex">
+                        {weeks.map((week, i) => (
+                          <div
+                            key={i}
+                            className={`flex-1 min-w-[100px] border-r ${
+                              isCurrentWeek(week) ? 'bg-primary/5' : ''
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Epic bar */}
+                      {barStyle && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div
+                                className="absolute top-4 h-8 rounded-md cursor-pointer hover:opacity-80 transition-opacity flex items-center px-2 text-white text-xs font-medium truncate"
+                                style={{
+                                  ...barStyle,
+                                  backgroundColor: epic.color,
+                                }}
+                                onClick={() => onEpicClick(epic.id)}
+                              >
+                                {epic.name}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-sm">
+                                <div className="font-medium">{epic.name}</div>
+                                <div className="text-muted-foreground">
+                                  {epic.startDate && formatDate(new Date(epic.startDate))}
+                                  {epic.startDate && epic.endDate && ' - '}
+                                  {epic.endDate && formatDate(new Date(epic.endDate))}
+                                </div>
+                                <div className="mt-1">
+                                  {stats.done}/{stats.total} tasks done
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+
+                      {/* Tasks */}
+                      <div className="absolute bottom-2 left-0 right-0 px-2">
+                        <div className="flex gap-1 overflow-hidden">
+                          {(epic.tasks || []).slice(0, 8).map((task) => (
+                            <TooltipProvider key={task.id}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => onTaskClick(task)}
+                                    className={`w-5 h-5 rounded text-[10px] font-medium flex items-center justify-center ${
+                                      task.status === 'DONE' || task.status === 'LIVE'
+                                        ? 'bg-green-500 text-white'
+                                        : task.status === 'IN_PROGRESS'
+                                        ? 'bg-blue-500 text-white'
+                                        : task.status === 'BLOCKED'
+                                        ? 'bg-red-500 text-white'
+                                        : 'bg-muted text-muted-foreground'
+                                    }`}
+                                  >
+                                    {task.taskKey?.split('-')[1] || '?'}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm">
+                                    <div className="font-medium">{task.taskKey}</div>
+                                    <div>{task.title}</div>
+                                    <div className="text-muted-foreground">{task.status}</div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ))}
+                          {(epic.tasks || []).length > 8 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              +{epic.tasks.length - 8}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+            {epicsWithTasks.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground">
+                <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <p className="text-lg font-medium">No epics yet</p>
+                <p className="text-sm mt-1">Create epics to organize your work on a timeline</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      ) : (
+        /* List view */
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-4">
+            {epicsWithTasks.map((epic) => {
+              const stats = getTaskStats(epic.tasks || [])
+
+              return (
+                <div key={epic.id} className="border rounded-lg overflow-hidden">
+                  {/* Epic header */}
+                  <div
+                    className="p-4 cursor-pointer hover:bg-muted/30"
+                    onClick={() => onEpicClick(epic.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-4 h-4 rounded-full"
+                          style={{ backgroundColor: epic.color }}
+                        />
+                        <div>
+                          <h3 className="font-semibold">{epic.name}</h3>
+                          {epic.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {epic.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div className="font-medium">{stats.progress}%</div>
+                        <div className="text-muted-foreground">
+                          {stats.done}/{stats.total} done
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all"
+                        style={{ width: `${stats.progress}%` }}
+                      />
+                    </div>
+
+                    {/* Dates */}
+                    {(epic.startDate || epic.endDate) && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {epic.startDate && formatDate(new Date(epic.startDate))}
+                        {epic.startDate && epic.endDate && ' - '}
+                        {epic.endDate && formatDate(new Date(epic.endDate))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tasks */}
+                  {(epic.tasks || []).length > 0 && (
+                    <div className="border-t bg-muted/20">
+                      <div className="p-3">
+                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                          Tasks ({epic.tasks?.length})
+                        </div>
+                        <div className="space-y-1">
+                          {(epic.tasks || []).slice(0, 5).map((task) => (
+                            <button
+                              key={task.id}
+                              onClick={() => onTaskClick(task)}
+                              className="w-full text-left p-2 rounded hover:bg-background flex items-center gap-3"
+                            >
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${
+                                  task.status === 'DONE' || task.status === 'LIVE'
+                                    ? 'bg-green-500/10 text-green-600 border-green-200'
+                                    : task.status === 'IN_PROGRESS'
+                                    ? 'bg-blue-500/10 text-blue-600 border-blue-200'
+                                    : task.status === 'BLOCKED'
+                                    ? 'bg-red-500/10 text-red-600 border-red-200'
+                                    : ''
+                                }`}
+                              >
+                                {task.taskKey}
+                              </Badge>
+                              <span className="flex-1 truncate text-sm">{task.title}</span>
+                              {task.assignee && (
+                                <Avatar className="h-5 w-5">
+                                  <AvatarImage src={task.assignee.avatarUrl || undefined} />
+                                  <AvatarFallback className="text-[10px]">
+                                    {task.assignee.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              )}
+                            </button>
+                          ))}
+                          {(epic.tasks || []).length > 5 && (
+                            <button
+                              onClick={() => onEpicClick(epic.id)}
+                              className="w-full text-center text-sm text-primary hover:underline py-1"
+                            >
+                              View all {epic.tasks?.length} tasks
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {epicsWithTasks.length === 0 && (
+              <div className="text-center py-20 text-muted-foreground">
+                <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <p className="text-lg font-medium">No epics yet</p>
+                <p className="text-sm mt-1">Create epics to organize your work</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  )
+}
+

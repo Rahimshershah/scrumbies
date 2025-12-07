@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Task, Sprint, TaskStatus, Priority, Activity, Comment, TaskChain, TaskChainItem, Attachment } from '@/types'
+import { Task, Sprint, TaskStatus, Priority, Activity, Comment, TaskChain, TaskChainItem, Attachment, Epic } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +50,7 @@ interface TaskDetailSidebarProps {
   task: Task
   users: { id: string; name: string; avatarUrl?: string | null }[]
   sprints: Sprint[]
+  epics?: Epic[]
   currentUserId?: string
   currentUserRole?: string
   projectId?: string
@@ -73,6 +74,7 @@ export function TaskDetailSidebar({
   task,
   users,
   sprints,
+  epics = [],
   currentUserId,
   currentUserRole,
   projectId,
@@ -94,6 +96,7 @@ export function TaskDetailSidebar({
   const [team, setTeam] = useState<string>(task.team || 'none')
   const [assigneeId, setAssigneeId] = useState(task.assigneeId || 'unassigned')
   const [sprintId, setSprintId] = useState(task.sprintId || 'backlog')
+  const [epicId, setEpicId] = useState(task.epicId || 'none')
   const [saving, setSaving] = useState(false)
   const [splitting, setSplitting] = useState(false)
   const [showSplitDialog, setShowSplitDialog] = useState(false)
@@ -139,6 +142,7 @@ export function TaskDetailSidebar({
     setTeam(task.team || 'none')
     setAssigneeId(task.assigneeId || 'unassigned')
     setSprintId(task.sprintId || 'backlog')
+    setEpicId(task.epicId || 'none')
   }, [task])
 
   // Load activities, comments, chain, attachments, and linked documents
@@ -210,6 +214,7 @@ export function TaskDetailSidebar({
           team: team === 'none' ? null : team,
           assigneeId: assigneeId === 'unassigned' ? null : assigneeId,
           sprintId: sprintId === 'backlog' ? null : sprintId,
+          epicId: epicId === 'none' ? null : epicId,
         }),
       })
       if (!res.ok) {
@@ -711,6 +716,48 @@ export function TaskDetailSidebar({
                       </Select>
                     )}
                   </div>
+
+                  {/* Epic */}
+                  {epics.length > 0 && (
+                    <div className="flex items-center py-1">
+                      <span className="text-sm text-muted-foreground w-28 flex-shrink-0">Epic</span>
+                      {readOnly ? (
+                        <div className="flex items-center gap-2">
+                          {task.epic ? (
+                            <>
+                              <div
+                                className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: task.epic.color }}
+                              />
+                              <span className="text-sm">{task.epic.name}</span>
+                            </>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No epic</span>
+                          )}
+                        </div>
+                      ) : (
+                        <Select value={epicId} onValueChange={setEpicId}>
+                          <SelectTrigger className="w-40 h-8 text-sm">
+                            <SelectValue placeholder="No epic" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No epic</SelectItem>
+                            {epics.map((epic) => (
+                              <SelectItem key={epic.id} value={epic.id}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: epic.color }}
+                                  />
+                                  {epic.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
 
                   {/* Reporter */}
                   <div className="flex items-center py-1">

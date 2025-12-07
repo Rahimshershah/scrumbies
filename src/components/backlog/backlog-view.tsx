@@ -13,13 +13,15 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
-import { Sprint, Task } from '@/types'
+import { Sprint, Task, Epic } from '@/types'
 import { SprintSection } from './sprint-section'
 import { BacklogSection } from './backlog-section'
 import { TaskDetailSidebar } from './task-detail-sidebar'
 import { CreateSprintModal } from './create-sprint-modal'
 import { AppLayout } from '@/components/layout/app-layout'
 import { SprintView } from './sprint-view'
+import { EpicPanel } from './epic-panel'
+import { EpicTimeline } from './epic-timeline'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +41,7 @@ import {
 interface BacklogViewProps {
   initialSprints: Sprint[]
   initialBacklog: Task[]
+  initialEpics?: Epic[]
   users: { id: string; name: string; avatarUrl?: string | null }[]
   currentUser?: { id: string; name: string; role: string }
   projectId: string
@@ -56,20 +59,24 @@ interface PendingMove {
   newOrder: number
 }
 
-export function BacklogView({ initialSprints, initialBacklog, users, currentUser, projectId, onOpenDocument, taskToOpen }: BacklogViewProps) {
+export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen }: BacklogViewProps) {
   const { rowHeight, setRowHeight } = useRowHeight()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
+  const [epics, setEpics] = useState<Epic[]>(initialEpics)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showCreateSprint, setShowCreateSprint] = useState(false)
   const [viewingSprint, setViewingSprint] = useState<Sprint | null>(null)
+  const [viewingTimeline, setViewingTimeline] = useState(false)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [lastOpenedTaskId, setLastOpenedTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterPriority, setFilterPriority] = useState<Priority | 'ALL'>('ALL')
   const [filterAssignee, setFilterAssignee] = useState<string | 'ALL'>('ALL')
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
+  const [filterEpic, setFilterEpic] = useState<string | null>(null) // null = all, 'none' = no epic, epicId = specific epic
+  const [showEpicPanel, setShowEpicPanel] = useState(true)
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
@@ -153,8 +160,17 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
     // Status filter
     if (filterStatus !== 'ALL' && task.status !== filterStatus) return false
     
+    // Epic filter
+    if (filterEpic !== null) {
+      if (filterEpic === 'none') {
+        if (task.epicId !== null && task.epicId !== undefined) return false
+      } else {
+        if (task.epicId !== filterEpic) return false
+      }
+    }
+    
     return true
-  }, [searchQuery, filterPriority, filterAssignee, filterStatus, matchesSearch])
+  }, [searchQuery, filterPriority, filterAssignee, filterStatus, filterEpic, matchesSearch])
 
   // Categorize sprints
   const activeSprints = sprints.filter(s => s.status === 'ACTIVE')
@@ -673,7 +689,41 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
       onSprintReactivate={handleSprintReactivate}
     >
       <div className="flex h-full">
+        {/* Epic Panel - Timeline view */}
+        {viewingTimeline && (
+          <div className="flex-1">
+            <EpicTimeline
+              epics={epics}
+              sprints={sprints}
+              onBack={() => setViewingTimeline(false)}
+              onTaskClick={(task) => {
+                setViewingTimeline(false)
+                setSelectedTask(task)
+              }}
+              onEpicClick={(epicId) => {
+                setViewingTimeline(false)
+                setFilterEpic(epicId)
+              }}
+            />
+          </div>
+        )}
+
+        {/* Epic Panel - Sidebar */}
+        {!viewingTimeline && !currentViewingSprint && showEpicPanel && (
+          <EpicPanel
+            epics={epics}
+            selectedEpicId={filterEpic}
+            onSelectEpic={setFilterEpic}
+            onEpicCreated={(epic) => setEpics(prev => [...prev, epic])}
+            onEpicUpdated={(epic) => setEpics(prev => prev.map(e => e.id === epic.id ? epic : e))}
+            onEpicDeleted={(epicId) => setEpics(prev => prev.filter(e => e.id !== epicId))}
+            onViewTimeline={() => setViewingTimeline(true)}
+            projectId={projectId}
+          />
+        )}
+
         {/* Main content area */}
+        {!viewingTimeline && (
         <div className="flex-1 min-w-0 h-full">
           {/* Show sprint view or main backlog */}
           {currentViewingSprint ? (
@@ -841,7 +891,23 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                   </SelectContent>
                 </Select>
 
-                {(filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL' || searchQuery.trim()) && (
+                {/* Epic toggle button */}
+                <Button
+                  variant={showEpicPanel ? "default" : "outline"}
+                  size="sm"
+                  className="h-9"
+                  onClick={() => setShowEpicPanel(!showEpicPanel)}
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Epics
+                  {epics.length > 0 && (
+                    <Badge variant="secondary" className="ml-1.5 text-xs">{epics.length}</Badge>
+                  )}
+                </Button>
+
+                {(filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL' || filterEpic !== null || searchQuery.trim()) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -850,6 +916,7 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
                       setFilterPriority('ALL')
                       setFilterAssignee('ALL')
                       setFilterStatus('ALL')
+                      setFilterEpic(null)
                     }}
                     className="h-9 text-xs"
                   >
@@ -994,8 +1061,40 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
       </ScrollArea>
           )}
         </div>
+        )}
 
-        {/* Move/Split confirmation dialog */}
+        {/* Task detail sidebar - inline next to content */}
+        {selectedTask && (
+          <TaskDetailSidebar
+            task={selectedTask}
+            users={users}
+            sprints={sprints}
+            epics={epics}
+            currentUserId={currentUser?.id}
+            currentUserRole={currentUser?.role}
+            projectId={projectId}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={handleTaskUpdate}
+            onDelete={handleTaskDelete}
+            onSplit={handleTaskSplit}
+            onTaskSelect={async (taskId) => {
+              // Fetch the task and select it
+              try {
+                const res = await fetch(`/api/tasks/${taskId}`)
+                if (res.ok) {
+                  const task = await res.json()
+                  setSelectedTask(task)
+                }
+              } catch (error) {
+                console.error('Failed to fetch task:', error)
+              }
+            }}
+            onOpenDocument={onOpenDocument}
+          />
+        )}
+      </div>
+
+      {/* Move/Split confirmation dialog */}
       <Dialog open={!!pendingMove} onOpenChange={() => cancelMove()}>
         <DialogContent>
           <DialogHeader>
@@ -1043,36 +1142,6 @@ export function BacklogView({ initialSprints, initialBacklog, users, currentUser
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-        {/* Task detail sidebar - inline next to content */}
-        {selectedTask && (
-          <TaskDetailSidebar
-            task={selectedTask}
-            users={users}
-            sprints={sprints}
-            currentUserId={currentUser?.id}
-            currentUserRole={currentUser?.role}
-            projectId={projectId}
-            onClose={() => setSelectedTask(null)}
-            onUpdate={handleTaskUpdate}
-            onDelete={handleTaskDelete}
-            onSplit={handleTaskSplit}
-            onTaskSelect={async (taskId) => {
-              // Fetch the task and select it
-              try {
-                const res = await fetch(`/api/tasks/${taskId}`)
-                if (res.ok) {
-                  const task = await res.json()
-                  setSelectedTask(task)
-                }
-              } catch (error) {
-                console.error('Failed to fetch task:', error)
-              }
-            }}
-            onOpenDocument={onOpenDocument}
-          />
-        )}
-      </div>
 
       {/* Create sprint modal */}
       {showCreateSprint && (

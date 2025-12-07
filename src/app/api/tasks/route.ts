@@ -25,6 +25,13 @@ export async function GET(request: NextRequest) {
             avatarUrl: true,
           },
         },
+        epic: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
         splitFrom: {
           select: {
             id: true,
@@ -59,7 +66,7 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth()
 
     const body = await request.json()
-    const { title, description, sprintId, projectId, assigneeId, team, status, priority } = body
+    const { title, description, sprintId, projectId, assigneeId, team, status, priority, epicId } = body
 
     if (!title) {
       return NextResponse.json(
@@ -100,6 +107,7 @@ export async function POST(request: NextRequest) {
         taskNumber,
         sprintId: sprintId || null,
         projectId: projectId || null,
+        epicId: epicId || null,
         assigneeId: assigneeId || null,
         assignedAt: assigneeId ? new Date() : null,
         team: team || null,
@@ -114,6 +122,13 @@ export async function POST(request: NextRequest) {
             id: true,
             name: true,
             avatarUrl: true,
+          },
+        },
+        epic: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
           },
         },
         splitFrom: {
