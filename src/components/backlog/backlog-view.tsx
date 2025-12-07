@@ -76,7 +76,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   const [filterAssignee, setFilterAssignee] = useState<string | 'ALL'>('ALL')
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
   const [filterEpic, setFilterEpic] = useState<string | null>(null) // null = all, 'none' = no epic, epicId = specific epic
-  const [showEpicPanel, setShowEpicPanel] = useState(false) // Collapsed by default
+  const [showEpicPanel, setShowEpicPanel] = useState(true) // Always show epic panel
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
@@ -716,8 +716,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
           </div>
         )}
 
-        {/* Epic Panel - Sidebar */}
-        {!viewingTimeline && !currentViewingSprint && showEpicPanel && (
+        {/* Epic Panel - Sidebar (always visible) */}
+        {!viewingTimeline && !currentViewingSprint && (
           <EpicPanel
             epics={epics}
             selectedEpicId={filterEpic}
@@ -898,22 +898,6 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     <SelectItem value="LIVE">Live</SelectItem>
                   </SelectContent>
                 </Select>
-
-                {/* Epic toggle button */}
-                <Button
-                  variant={showEpicPanel ? "default" : "outline"}
-                  size="sm"
-                  className="h-9"
-                  onClick={() => setShowEpicPanel(!showEpicPanel)}
-                >
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  Epics
-                  {epics.length > 0 && (
-                    <Badge variant="secondary" className="ml-1.5 text-xs">{epics.length}</Badge>
-                  )}
-                </Button>
 
                 {(filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL' || filterEpic !== null || searchQuery.trim()) && (
                   <Button

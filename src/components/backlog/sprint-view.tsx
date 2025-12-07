@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Sprint, Task, TaskStatus, Priority } from '@/types'
+import { Sprint, Task, TaskStatus, Priority, Epic } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -23,6 +23,19 @@ import { KanbanView } from './kanban-view'
 import { cn } from '@/lib/utils'
 import { useProjectSettings } from '@/contexts/project-settings-context'
 import { useRowHeight } from '@/contexts/row-height-context'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface SprintViewProps {
   sprint: Sprint
