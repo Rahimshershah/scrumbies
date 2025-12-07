@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-utils'
 
+// Helper to strip HTML tags and decode common entities
+function stripHtml(html: string): string {
+  if (!html) return ''
+  return html
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim()
+}
+
 // Helper to generate PDF-compatible HTML
 function generateReportHTML(reports: any[], taskOptions: Record<string, { includeComments: boolean; includeImages: boolean }>) {
   const formatDate = (date: string) => {
@@ -240,8 +255,9 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
         `
 
         if (task.description) {
-          const desc = task.description.replace(/<[^>]*>/g, '').slice(0, 80)
-          html += `<div class="task-description">${desc}${task.description.length > 80 ? '...' : ''}</div>`
+          const desc = stripHtml(task.description)
+          const truncated = desc.slice(0, 160)
+          html += `<div class="task-description">${truncated}${desc.length > 160 ? '...' : ''}</div>`
         }
 
         // Meta info
@@ -257,11 +273,12 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
         if (opts.includeComments && task.comments && task.comments.length > 0) {
           html += `<div class="comments">`
           for (const comment of task.comments.slice(0, 3)) {
-            const text = comment.content.replace(/<[^>]*>/g, '').slice(0, 60)
+            const text = stripHtml(comment.content)
+            const truncated = text.slice(0, 80)
             html += `
               <div class="comment">
                 <span class="comment-author">${comment.author.name}:</span>
-                <span class="comment-text">${text}${comment.content.length > 60 ? '...' : ''}</span>
+                <span class="comment-text">${truncated}${text.length > 80 ? '...' : ''}</span>
               </div>
             `
           }

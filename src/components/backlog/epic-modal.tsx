@@ -16,16 +16,42 @@ interface EpicModalProps {
 }
 
 const EPIC_COLORS = [
+  // Blues
+  '#3b82f6', // Blue
+  '#0ea5e9', // Sky
+  '#06b6d4', // Cyan
+  '#2563eb', // Blue 600
+  '#1d4ed8', // Blue 700
+  // Purples
   '#6366f1', // Indigo
   '#8b5cf6', // Violet
+  '#a855f7', // Purple
+  '#c026d3', // Fuchsia
+  '#7c3aed', // Violet 600
+  // Pinks & Reds
   '#ec4899', // Pink
+  '#f43f5e', // Rose
   '#ef4444', // Red
+  '#dc2626', // Red 600
+  '#be123c', // Rose 700
+  // Oranges & Yellows
   '#f97316', // Orange
+  '#ea580c', // Orange 600
   '#eab308', // Yellow
+  '#f59e0b', // Amber
+  '#ca8a04', // Yellow 600
+  // Greens & Teals
   '#22c55e', // Green
+  '#16a34a', // Green 600
   '#14b8a6', // Teal
-  '#06b6d4', // Cyan
-  '#3b82f6', // Blue
+  '#0d9488', // Teal 600
+  '#10b981', // Emerald
+  // Neutrals & Others
+  '#64748b', // Slate
+  '#71717a', // Zinc
+  '#78716c', // Stone
+  '#0f172a', // Slate 900
+  '#374151', // Gray 700
 ]
 
 export function EpicModal({ isOpen, onClose, onSave, epic, projectId }: EpicModalProps) {

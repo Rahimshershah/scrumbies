@@ -100,6 +100,15 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
     }
   }
 
+  // Helper to strip HTML tags and decode entities
+  const stripHtml = (html: string) => {
+    if (!html) return ''
+    // Create a temporary div to decode HTML entities
+    const temp = document.createElement('div')
+    temp.innerHTML = html
+    return temp.textContent || temp.innerText || ''
+  }
+
   const downloadPDF = async () => {
     if (!reportData) return
 
@@ -117,19 +126,22 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
       if (res.ok) {
         const html = await res.text()
         
-        // Open in new window and trigger print
-        const printWindow = window.open('', '_blank')
+        // Create blob and open in new tab
+        const blob = new Blob([html], { type: 'text/html' })
+        const url = URL.createObjectURL(blob)
+        const printWindow = window.open(url, '_blank')
+        
         if (printWindow) {
-          printWindow.document.write(html)
-          printWindow.document.close()
-          
-          // Wait for content to load then print
-          printWindow.onload = () => {
+          // Wait for window to load, then print
+          printWindow.addEventListener('load', () => {
             setTimeout(() => {
               printWindow.print()
-            }, 250)
-          }
+            }, 300)
+          })
         }
+        
+        // Clean up blob URL after a delay
+        setTimeout(() => URL.revokeObjectURL(url), 60000)
       }
     } catch (error) {
       console.error('Failed to download PDF:', error)
@@ -410,10 +422,13 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
                                           )}
                                         </div>
                                         
-                                        {/* Description preview - 80 chars */}
+                                        {/* Description preview - 160 chars, HTML stripped */}
                                         {task.description && (
-                                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                                            {task.description.slice(0, 80)}{task.description.length > 80 ? '...' : ''}
+                                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                                            {(() => {
+                                              const clean = stripHtml(task.description)
+                                              return clean.slice(0, 160) + (clean.length > 160 ? '...' : '')
+                                            })()}
                                           </p>
                                         )}
 
