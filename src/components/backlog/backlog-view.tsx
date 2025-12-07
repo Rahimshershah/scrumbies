@@ -708,7 +708,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
               sprints={sprints}
               onBack={() => setViewingTimeline(false)}
               onTaskClick={(task) => {
-                setViewingTimeline(false)
+                // Stay in timeline, just open the detail sidebar
                 setSelectedTask(task)
               }}
               onEpicClick={(epicId) => {
