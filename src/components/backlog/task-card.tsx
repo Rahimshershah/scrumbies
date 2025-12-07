@@ -283,13 +283,13 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       </div>
 
       {/* Epic dropdown - positioned more centrally with spacing */}
-      <div className="w-32 flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-44 flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full text-left hover:opacity-80 transition-opacity">
               {task.epic ? (
                 <Badge 
-                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer truncate max-w-full")}
+                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer")}
                   style={{ 
                     backgroundColor: `${task.epic.color}20`, 
                     color: task.epic.color,

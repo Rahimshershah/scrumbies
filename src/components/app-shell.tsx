@@ -262,6 +262,7 @@ export function AppShell({
             projectId={effectiveProjectId}
             onOpenDocument={handleOpenDocument}
             taskToOpen={taskToOpen}
+            onNavigateToReports={() => handleViewChange('reports')}
           />
         ) : currentView === 'reports' ? (
           <ReportsView
