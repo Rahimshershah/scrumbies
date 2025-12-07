@@ -530,7 +530,7 @@ export async function POST(request: NextRequest) {
           
           browser = await puppeteer.default.launch({
             args: chromium.default.args,
-            defaultViewport: chromium.default.defaultViewport,
+            defaultViewport: { width: 800, height: 600 },
             executablePath: await chromium.default.executablePath(),
             headless: true,
           })
