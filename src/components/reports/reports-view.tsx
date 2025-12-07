@@ -151,7 +151,7 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
             windowWidth: 794, // A4 at 96dpi
           },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: 'avoid-all', before: '.sprint' }
+          pagebreak: { mode: ['avoid-all'], before: ['.sprint'] }
         }
         
         await html2pdf().set(opt).from(container).save()
