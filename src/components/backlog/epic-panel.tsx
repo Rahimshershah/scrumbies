@@ -170,64 +170,66 @@ export function EpicPanel({
             {epics.map((epic) => (
               <div
                 key={epic.id}
-                className={`group relative rounded-md transition-colors ${
+                className={`group rounded-md transition-colors overflow-hidden ${
                   selectedEpicId === epic.id
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted'
                 }`}
               >
-                <button
-                  onClick={() => onSelectEpic(epic.id)}
-                  className="w-full text-left px-3 py-2 pr-8"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: epic.color }}
-                    />
-                    <span className="font-medium truncate text-sm">{epic.name}</span>
-                  </div>
-                  {epic._count && (
-                    <div className={`text-xs mt-1 ${selectedEpicId === epic.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                      {epic._count.tasks} task{epic._count.tasks !== 1 ? 's' : ''}
+                <div className="flex items-center">
+                  <button
+                    onClick={() => onSelectEpic(epic.id)}
+                    className="flex-1 min-w-0 text-left px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: epic.color }}
+                      />
+                      <span className="font-medium truncate text-sm">{epic.name}</span>
                     </div>
-                  )}
-                </button>
+                    {epic._count && (
+                      <div className={`text-xs mt-1 ${selectedEpicId === epic.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                        {epic._count.tasks} task{epic._count.tasks !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </button>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
-                        selectedEpicId === epic.id ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted-foreground/20'
-                      }`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => {
-                      setEditingEpic(epic)
-                      setShowModal(true)
-                    }}>
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(epic.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className={`flex-shrink-0 p-1.5 mr-1 rounded opacity-60 hover:opacity-100 transition-opacity ${
+                          selectedEpicId === epic.id ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted-foreground/20'
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        setEditingEpic(epic)
+                        setShowModal(true)
+                      }}>
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(epic.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             ))}
 
