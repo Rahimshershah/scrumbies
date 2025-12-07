@@ -141,6 +141,7 @@ export async function POST(
         description: transferDescription ? originalTask.description : null,
         sprintId: destSprintId,
         projectId: originalTask.projectId, // Keep same project
+        epicId: originalTask.epicId, // Keep same epic
         assigneeId: originalTask.assigneeId,
         createdById: user.id,
         team: originalTask.team,

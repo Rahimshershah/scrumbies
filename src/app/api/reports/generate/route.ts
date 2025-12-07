@@ -3,15 +3,36 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import OpenAI from 'openai'
 
+// Helper to strip HTML tags
+function stripHtml(html: string): string {
+  if (!html) return ''
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export async function POST(request: NextRequest) {
   try {
     await requireAuth()
 
     const body = await request.json()
-    const { sprintIds, projectId, useAI, taskOptions } = body
+    const { sprintIds, projectId } = body
 
     if (!sprintIds || sprintIds.length === 0) {
       return NextResponse.json({ error: 'No sprints selected' }, { status: 400 })
+    }
+
+    const hasOpenAI = !!process.env.OPENAI_API_KEY
+    let openai: OpenAI | null = null
+    if (hasOpenAI) {
+      openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     }
 
     // Fetch sprints with all related data
@@ -65,20 +86,97 @@ export async function POST(request: NextRequest) {
           epicGroups.set(epicId, [])
         }
         
-        // Count how many sprints this task has been in (simplified - count activities)
+        // Count how many sprints this task has been in
         const sprintCount = await prisma.sprint.count({
           where: {
             tasks: {
-              some: {
-                id: task.id,
-              },
+              some: { id: task.id },
             },
           },
         })
 
+        // Get clean description
+        const cleanDescription = stripHtml(task.description || '')
+        
+        // Get clean comments
+        const cleanComments = task.comments.map((c: any) => ({
+          author: c.author.name,
+          content: stripHtml(c.content),
+        }))
+
+        // Generate AI summary for this task if it has content
+        let aiDescriptionSummary: string | null = null
+        let aiCommentsSummary: string | null = null
+
+        if (openai && (cleanDescription || cleanComments.length > 0)) {
+          try {
+            // Summarize description if exists
+            if (cleanDescription && cleanDescription.length > 50) {
+              const descCompletion = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'Summarize this task description in 1-2 concise sentences. Be direct and professional. If it\'s already short, just clean it up.',
+                  },
+                  {
+                    role: 'user',
+                    content: cleanDescription,
+                  },
+                ],
+                max_tokens: 100,
+              })
+              aiDescriptionSummary = descCompletion.choices[0]?.message?.content || null
+            } else if (cleanDescription) {
+              aiDescriptionSummary = cleanDescription
+            }
+
+            // Summarize comments if exists
+            if (cleanComments.length > 0) {
+              const commentsText = cleanComments
+                .map((c: any) => `${c.author}: ${c.content}`)
+                .join('\n')
+              
+              const commentsCompletion = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'Summarize the key discussion points from these comments in 1-2 sentences. Focus on decisions made, blockers mentioned, or important updates. Be concise.',
+                  },
+                  {
+                    role: 'user',
+                    content: commentsText,
+                  },
+                ],
+                max_tokens: 100,
+              })
+              aiCommentsSummary = commentsCompletion.choices[0]?.message?.content || null
+            }
+          } catch (error) {
+            console.error('Failed to generate task AI summary:', error)
+            // Fall back to clean text
+            if (cleanDescription) {
+              aiDescriptionSummary = cleanDescription.slice(0, 200) + (cleanDescription.length > 200 ? '...' : '')
+            }
+          }
+        } else {
+          // No AI - just use clean text
+          if (cleanDescription) {
+            aiDescriptionSummary = cleanDescription.slice(0, 200) + (cleanDescription.length > 200 ? '...' : '')
+          }
+          if (cleanComments.length > 0) {
+            aiCommentsSummary = cleanComments.slice(0, 2).map((c: any) => `${c.author}: ${c.content.slice(0, 60)}...`).join(' | ')
+          }
+        }
+
         epicGroups.get(epicId)!.push({
           ...task,
           sprintCount,
+          aiDescriptionSummary,
+          aiCommentsSummary,
+          hasComments: cleanComments.length > 0,
+          hasDescription: !!cleanDescription,
         })
       }
 
@@ -97,14 +195,10 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Generate AI summary if requested
+      // Generate sprint-level AI summary
       let aiSummary = undefined
-      if (useAI && process.env.OPENAI_API_KEY) {
+      if (openai) {
         try {
-          const openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY,
-          })
-
           const taskSummaries = sprint.tasks.map(t => 
             `- ${t.taskKey}: ${t.title} (${t.status})`
           ).join('\n')
@@ -126,7 +220,7 @@ export async function POST(request: NextRequest) {
 
           aiSummary = completion.choices[0]?.message?.content
         } catch (error) {
-          console.error('Failed to generate AI summary:', error)
+          console.error('Failed to generate sprint AI summary:', error)
         }
       }
 
@@ -153,4 +247,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
-
