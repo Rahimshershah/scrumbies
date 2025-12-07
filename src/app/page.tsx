@@ -43,7 +43,7 @@ export default async function Home() {
   const currentProjectId = projects[0]?.id || null
 
   // Fetch initial data for the default project
-  const [sprints, users, backlogTasks] = await Promise.all([
+  const [sprints, users, backlogTasks, epics] = await Promise.all([
     currentProjectId
       ? prisma.sprint.findMany({
           where: { projectId: currentProjectId },
@@ -57,6 +57,13 @@ export default async function Home() {
                     id: true,
                     name: true,
                     avatarUrl: true,
+                  },
+                },
+                epic: {
+                  select: {
+                    id: true,
+                    name: true,
+                    color: true,
                   },
                 },
                 splitFrom: {
@@ -104,6 +111,13 @@ export default async function Home() {
                 avatarUrl: true,
               },
             },
+            epic: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
             splitFrom: {
               select: {
                 id: true,
@@ -124,6 +138,20 @@ export default async function Home() {
           },
         })
       : [],
+    currentProjectId
+      ? prisma.epic.findMany({
+          where: { projectId: currentProjectId },
+          orderBy: { order: 'asc' },
+          include: {
+            createdBy: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+            _count: {
+              select: { tasks: true },
+            },
+          },
+        })
+      : [],
   ])
 
   const unreadCount = await prisma.notification.count({
@@ -138,6 +166,7 @@ export default async function Home() {
         initialProjectId={currentProjectId}
         initialSprints={sprints as any}
         initialBacklog={backlogTasks as any}
+        initialEpics={epics as any}
         users={users}
         unreadCount={unreadCount}
       />

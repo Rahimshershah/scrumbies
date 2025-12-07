@@ -354,6 +354,22 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
                 variant="ghost"
                 size="sm"
                 className={`h-7 px-3 rounded-md transition-all ${
+                  currentView === 'epics' 
+                    ? 'bg-primary text-primary-foreground shadow-sm font-medium hover:bg-primary/90' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-transparent'
+                }`}
+                onClick={() => onViewChange?.('epics')}
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Epics
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={`h-7 px-3 rounded-md transition-all ${
                   currentView === 'spaces' 
                     ? 'bg-primary text-primary-foreground shadow-sm font-medium hover:bg-primary/90' 
                     : 'text-muted-foreground hover:text-foreground hover:bg-transparent'

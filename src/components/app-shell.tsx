@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { BacklogView } from '@/components/backlog/backlog-view'
+import { EpicTimeline } from '@/components/backlog/epic-timeline'
 import { SpacesView } from '@/components/spaces'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
 import { RowHeightProvider } from '@/contexts/row-height-context'
 import { Project, Sprint, Task, Epic } from '@/types'
 
-export type AppView = 'backlog' | 'spaces'
+export type AppView = 'backlog' | 'epics' | 'spaces'
 
 interface AppShellProps {
   user: {
@@ -24,6 +25,7 @@ interface AppShellProps {
   initialProjectId: string | null
   initialSprints: Sprint[]
   initialBacklog: Task[]
+  initialEpics?: Epic[]
   users: { id: string; name: string; avatarUrl?: string | null }[]
   unreadCount: number
 }
@@ -34,6 +36,7 @@ export function AppShell({
   initialProjectId,
   initialSprints,
   initialBacklog,
+  initialEpics = [],
   users: initialUsers,
   unreadCount: initialUnreadCount,
 }: AppShellProps) {
@@ -44,7 +47,7 @@ export function AppShell({
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId)
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
-  const [epics, setEpics] = useState<Epic[]>([])
+  const [epics, setEpics] = useState<Epic[]>(initialEpics)
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [currentView, setCurrentView] = useState<AppView>('backlog')
@@ -54,7 +57,7 @@ export function AppShell({
   // Restore view from localStorage on mount
   useEffect(() => {
     const savedView = localStorage.getItem('scrumbies_current_view') as AppView | null
-    if (savedView && (savedView === 'backlog' || savedView === 'spaces')) {
+    if (savedView && (savedView === 'backlog' || savedView === 'epics' || savedView === 'spaces')) {
       setCurrentView(savedView)
     }
   }, [])
@@ -259,6 +262,19 @@ export function AppShell({
             projectId={effectiveProjectId}
             onOpenDocument={handleOpenDocument}
             taskToOpen={taskToOpen}
+          />
+        ) : currentView === 'epics' ? (
+          <EpicTimeline
+            epics={epics}
+            sprints={sprints}
+            onBack={() => handleViewChange('backlog')}
+            onTaskClick={(task) => {
+              setTaskToOpen(task.id)
+              handleViewChange('backlog')
+            }}
+            onEpicClick={() => {
+              // Stay in epics view
+            }}
           />
         ) : (
           <SpacesView

@@ -76,7 +76,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   const [filterAssignee, setFilterAssignee] = useState<string | 'ALL'>('ALL')
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
   const [filterEpic, setFilterEpic] = useState<string | null>(null) // null = all, 'none' = no epic, epicId = specific epic
-  const [showEpicPanel, setShowEpicPanel] = useState(true)
+  const [showEpicPanel, setShowEpicPanel] = useState(false) // Collapsed by default
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)

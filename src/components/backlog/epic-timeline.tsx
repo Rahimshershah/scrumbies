@@ -110,6 +110,45 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
     return { startDate: startOfWeek, endDate: endOfWeek, weeks }
   }, [epicsWithTasks, sprints])
 
+  // Calculate epic date range from its tasks' sprint dates if epic dates not set
+  const getEpicDateRange = (epic: EpicWithTasks): { start: string | null, end: string | null } => {
+    // If epic has explicit dates, use them
+    if (epic.startDate && epic.endDate) {
+      return { start: epic.startDate, end: epic.endDate }
+    }
+
+    // Otherwise, calculate from tasks' sprint dates
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+
+    (epic.tasks || []).forEach((task: any) => {
+      if (task.sprint?.startDate) {
+        const sprintStart = new Date(task.sprint.startDate)
+        if (!minDate || sprintStart < minDate) minDate = sprintStart
+      }
+      if (task.sprint?.endDate) {
+        const sprintEnd = new Date(task.sprint.endDate)
+        if (!maxDate || sprintEnd > maxDate) maxDate = sprintEnd
+      }
+    })
+
+    // If epic has start date but not end, use calculated end
+    if (epic.startDate && !epic.endDate && maxDate) {
+      return { start: epic.startDate, end: maxDate.toISOString() }
+    }
+
+    // If epic has end date but not start, use calculated start
+    if (!epic.startDate && epic.endDate && minDate) {
+      return { start: minDate.toISOString(), end: epic.endDate }
+    }
+
+    // Use fully calculated dates
+    return {
+      start: minDate ? minDate.toISOString() : null,
+      end: maxDate ? maxDate.toISOString() : null
+    }
+  }
+
   // Calculate position and width for a date range
   const getBarStyle = (start: string | null | undefined, end: string | null | undefined) => {
     if (!start) return null
@@ -230,7 +269,8 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
             {/* Epics */}
             {epicsWithTasks.map((epic) => {
               const stats = getTaskStats(epic.tasks || [])
-              const barStyle = getBarStyle(epic.startDate, epic.endDate)
+              const epicDates = getEpicDateRange(epic)
+              const barStyle = getBarStyle(epicDates.start, epicDates.end)
 
               return (
                 <div key={epic.id} className="border-b hover:bg-muted/30">
@@ -297,9 +337,9 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                               <div className="text-sm">
                                 <div className="font-medium">{epic.name}</div>
                                 <div className="text-muted-foreground">
-                                  {epic.startDate && formatDate(new Date(epic.startDate))}
-                                  {epic.startDate && epic.endDate && ' - '}
-                                  {epic.endDate && formatDate(new Date(epic.endDate))}
+                                  {epicDates.start && formatDate(new Date(epicDates.start))}
+                                  {epicDates.start && epicDates.end && ' - '}
+                                  {epicDates.end && formatDate(new Date(epicDates.end))}
                                 </div>
                                 <div className="mt-1">
                                   {stats.done}/{stats.total} tasks done
