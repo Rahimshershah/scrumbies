@@ -6,6 +6,7 @@ import { Header } from '@/components/header'
 import { BacklogView } from '@/components/backlog/backlog-view'
 import { SpacesView } from '@/components/spaces'
 import { ReportsView } from '@/components/reports/reports-view'
+import { AppLayout } from '@/components/layout/app-layout'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
 import { RowHeightProvider } from '@/contexts/row-height-context'
@@ -265,11 +266,16 @@ export function AppShell({
             onNavigateToReports={() => handleViewChange('reports')}
           />
         ) : currentView === 'reports' ? (
-          <ReportsView
-            projectId={effectiveProjectId}
-            sprints={sprints}
-            epics={epics}
-          />
+          <AppLayout
+            currentView="reports"
+            onViewChange={handleViewChange}
+          >
+            <ReportsView
+              projectId={effectiveProjectId}
+              sprints={sprints}
+              epics={epics}
+            />
+          </AppLayout>
         ) : (
           <SpacesView
             projectId={effectiveProjectId}
