@@ -157,23 +157,54 @@ export async function POST(request: NextRequest) {
         // For summarized reports, generate one summary per epic
         if (openai && reportType === 'summarized' && tasks.length > 0) {
           try {
+            // Build task list with accurate status information
             const taskList = tasks.map(t => {
               const desc = t.description ? stripHtml(t.description).slice(0, 100) : ''
-              return `- ${t.taskKey} "${t.title}": ${desc || 'No description'} (${t.status})`
+              const isComplete = t.status === 'DONE' || t.status === 'LIVE'
+              const wasSplit = t.splitTasks && t.splitTasks.length > 0
+              const isContinuation = !!t.splitFromId
+              
+              let statusInfo = ''
+              if (isComplete && !wasSplit) {
+                statusInfo = '✓ COMPLETED'
+              } else if (wasSplit) {
+                statusInfo = '⇅ SPLIT (work continued in next sprint)'
+              } else if (isContinuation && isComplete) {
+                statusInfo = '✓ COMPLETED (continuation from previous sprint)'
+              } else if (isContinuation) {
+                statusInfo = '↳ CONTINUATION (in progress)'
+              } else {
+                statusInfo = '→ CARRIED OVER (not completed)'
+              }
+              
+              return `- ${t.taskKey} "${t.title}": ${statusInfo}. ${desc || ''}`
             }).join('\n')
 
             const epicName = epic?.name || 'Uncategorized tasks'
+            const completedCount = tasks.filter(t => (t.status === 'DONE' || t.status === 'LIVE') && !(t.splitTasks && t.splitTasks.length > 0)).length
+            const splitCount = tasks.filter(t => t.splitTasks && t.splitTasks.length > 0).length
+            const carriedCount = tasks.filter(t => t.status !== 'DONE' && t.status !== 'LIVE').length
             
             const completion = await openai.chat.completions.create({
               model: 'gpt-4o-mini',
               messages: [
                 { 
                   role: 'system', 
-                  content: 'You are writing sprint report summaries. Summarize the following tasks under this epic in 2-3 sentences. Focus on what was accomplished, key features delivered, and any patterns. Be professional and concise.' 
+                  content: `You are writing sprint report summaries. Be accurate about task statuses:
+- COMPLETED means the task was fully finished
+- SPLIT means the task was partially done and work continues in the next sprint (do NOT say it was completed)
+- CARRIED OVER means the task was not completed and moves to next sprint
+- CONTINUATION means this task continues work from a previous sprint
+
+Summarize in 2-3 sentences. Be accurate about what was actually completed vs what is still in progress.` 
                 },
                 { 
                   role: 'user', 
-                  content: `Epic: ${epicName}\n\n${tasks.length} tasks:\n${taskList}` 
+                  content: `Epic: ${epicName}
+Stats: ${completedCount} completed, ${splitCount} split to next sprint, ${carriedCount} carried over
+
+${tasks.length} tasks:
+${taskList}` 
                 },
               ],
               max_tokens: 150,
@@ -195,20 +226,48 @@ export async function POST(request: NextRequest) {
       let aiSummary: string | undefined
       if (openai) {
         try {
-          const taskSummaries = sprint.tasks.map(t => 
-            `- ${t.taskKey}: ${t.title} (${t.status})`
-          ).join('\n')
+          // Calculate accurate stats
+          const completedTasks = sprint.tasks.filter(t => 
+            (t.status === 'DONE' || t.status === 'LIVE') && 
+            !(t.splitTasks && t.splitTasks.length > 0)
+          )
+          const splitTasks = sprint.tasks.filter(t => t.splitTasks && t.splitTasks.length > 0)
+          const carriedTasks = sprint.tasks.filter(t => t.status !== 'DONE' && t.status !== 'LIVE')
+          
+          const taskSummaries = sprint.tasks.map(t => {
+            const isComplete = t.status === 'DONE' || t.status === 'LIVE'
+            const wasSplit = t.splitTasks && t.splitTasks.length > 0
+            const isContinuation = !!t.splitFromId
+            
+            let status = ''
+            if (isComplete && !wasSplit) status = '✓ COMPLETED'
+            else if (wasSplit) status = '⇅ SPLIT'
+            else if (isContinuation) status = '↳ CONTINUATION'
+            else status = '→ CARRIED'
+            
+            return `- ${t.taskKey}: ${t.title} [${status}]`
+          }).join('\n')
 
           const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
               {
                 role: 'system',
-                content: 'Summarize sprint accomplishments in 2-3 sentences. Focus on deliverables and achievements. Be professional and brief.',
+                content: `Summarize sprint accomplishments accurately in 2-3 sentences. Be precise about status:
+- COMPLETED = fully finished
+- SPLIT = partially done, work continues next sprint (NOT completed)
+- CARRIED = moved to next sprint without completion
+- CONTINUATION = continues work from previous sprint
+
+Focus on what was actually delivered. Mention if significant work was split to continue later.`,
               },
               {
                 role: 'user',
-                content: `Sprint "${sprint.name}" - ${sprint.tasks.length} tasks:\n${taskSummaries}`,
+                content: `Sprint "${sprint.name}"
+Stats: ${completedTasks.length} fully completed, ${splitTasks.length} split to next sprint, ${carriedTasks.length} carried over
+
+Tasks:
+${taskSummaries}`,
               },
             ],
             max_tokens: 150,

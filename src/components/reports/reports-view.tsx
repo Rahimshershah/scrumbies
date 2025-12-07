@@ -96,6 +96,7 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
     setLoading(true)
     try {
+      // Request PDF format from server (uses Puppeteer for proper PDF with selectable text)
       const res = await fetch('/api/reports/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,77 +104,37 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
           reports: reportData,
           taskOptions,
           reportType,
+          format: 'pdf',
         }),
       })
 
       if (res.ok) {
-        const html = await res.text()
+        const contentType = res.headers.get('Content-Type')
         
-        // Dynamically import jsPDF and html2canvas
-        const { default: jsPDF } = await import('jspdf')
-        const { default: html2canvas } = await import('html2canvas')
-        
-        // Create an iframe to render the HTML properly
-        const iframe = document.createElement('iframe')
-        iframe.style.position = 'absolute'
-        iframe.style.left = '-9999px'
-        iframe.style.width = '800px'
-        iframe.style.height = '1200px'
-        document.body.appendChild(iframe)
-        
-        // Write HTML to iframe
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-        if (!iframeDoc) {
-          throw new Error('Failed to create iframe document')
+        if (contentType?.includes('application/pdf')) {
+          // Server returned a PDF - download it directly
+          const blob = await res.blob()
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+        } else {
+          // Fallback: Server returned HTML, open in new tab for printing
+          const html = await res.text()
+          const blob = new Blob([html], { type: 'text/html' })
+          const url = URL.createObjectURL(blob)
+          const printWindow = window.open(url, '_blank')
+          if (printWindow) {
+            printWindow.onload = () => {
+              setTimeout(() => printWindow.print(), 500)
+            }
+          }
+          setTimeout(() => URL.revokeObjectURL(url), 60000)
         }
-        
-        iframeDoc.open()
-        iframeDoc.write(html)
-        iframeDoc.close()
-        
-        // Wait for content to render
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Get the body element from iframe
-        const element = iframeDoc.body
-        
-        // Create canvas from the content
-        const canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          width: 800,
-          windowWidth: 800,
-        })
-        
-        // Calculate dimensions
-        const imgWidth = 210 // A4 width in mm
-        const pageHeight = 297 // A4 height in mm
-        const imgHeight = (canvas.height * imgWidth) / canvas.width
-        let heightLeft = imgHeight
-        let position = 0
-        
-        // Create PDF
-        const pdf = new jsPDF('p', 'mm', 'a4')
-        const imgData = canvas.toDataURL('image/jpeg', 0.95)
-        
-        // Add first page
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-        
-        // Add additional pages if needed
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight
-          pdf.addPage()
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
-          heightLeft -= pageHeight
-        }
-        
-        // Save PDF
-        pdf.save(`sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`)
-        
-        // Cleanup
-        document.body.removeChild(iframe)
       }
     } catch (error) {
       console.error('Failed to download PDF:', error)

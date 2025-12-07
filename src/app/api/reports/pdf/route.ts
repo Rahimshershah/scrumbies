@@ -26,67 +26,62 @@ function generateReportHTML(
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          font-size: 9px;
-          line-height: 1.35;
+          font-size: 10px;
+          line-height: 1.4;
           color: #1a1a1a;
-          padding: 20px;
+          padding: 24px;
           background: #fff;
         }
         
         /* Sprint Section */
         .sprint {
-          margin-bottom: 20px;
+          margin-bottom: 24px;
           page-break-inside: avoid;
         }
         .sprint-header {
           background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
           color: white;
-          padding: 14px 18px;
+          padding: 16px 20px;
           border-radius: 8px 8px 0 0;
         }
         .sprint-title {
-          font-size: 18px;
+          font-size: 20px;
           font-weight: 700;
-          margin-bottom: 2px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
+          margin-bottom: 4px;
         }
         .sprint-meta {
-          font-size: 10px;
+          font-size: 11px;
           opacity: 0.85;
-          display: flex;
-          gap: 14px;
-          margin-top: 6px;
+          margin-top: 8px;
         }
         .sprint-stats {
           display: flex;
-          gap: 10px;
-          margin-top: 10px;
+          gap: 12px;
+          margin-top: 12px;
         }
         .stat-box {
           background: rgba(255,255,255,0.15);
-          padding: 5px 10px;
-          border-radius: 5px;
+          padding: 8px 14px;
+          border-radius: 6px;
           text-align: center;
         }
-        .stat-number { font-size: 14px; font-weight: 700; }
-        .stat-label { font-size: 7px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-number { font-size: 18px; font-weight: 700; }
+        .stat-label { font-size: 8px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
         
         /* AI Summary */
         .ai-summary {
           background: #fefce8;
           border: 1px solid #fde047;
           border-top: none;
-          padding: 10px 14px;
-          font-size: 11px;
-          line-height: 1.5;
+          padding: 14px 18px;
+          font-size: 12px;
+          line-height: 1.6;
         }
         .ai-summary-label {
           font-weight: 600;
           color: #a16207;
-          font-size: 9px;
-          margin-bottom: 3px;
+          font-size: 10px;
+          margin-bottom: 4px;
         }
         .ai-summary-text { color: #713f12; }
         
@@ -94,7 +89,7 @@ function generateReportHTML(
         .epic-group {
           border: 1px solid #e2e8f0;
           border-top: none;
-          padding: 10px;
+          padding: 14px;
           background: #fff;
         }
         .epic-group:last-child {
@@ -103,27 +98,28 @@ function generateReportHTML(
         .epic-header {
           display: flex;
           align-items: center;
-          gap: 6px;
-          margin-bottom: 8px;
-          padding-bottom: 5px;
+          gap: 8px;
+          margin-bottom: 10px;
+          padding-bottom: 8px;
           border-bottom: 1px dashed #e2e8f0;
         }
         .epic-color {
-          width: 10px;
-          height: 10px;
+          width: 12px;
+          height: 12px;
           border-radius: 3px;
+          display: inline-block;
         }
         .epic-name {
           font-weight: 600;
-          font-size: 10px;
+          font-size: 12px;
           color: #1e293b;
         }
         .epic-count {
-          font-size: 8px;
+          font-size: 9px;
           color: #64748b;
           background: #f1f5f9;
-          padding: 2px 6px;
-          border-radius: 8px;
+          padding: 3px 8px;
+          border-radius: 10px;
         }
 
         /* Epic Summary (for summarized report) */
@@ -131,75 +127,69 @@ function generateReportHTML(
           background: #f8fafc;
           border: 1px solid #e2e8f0;
           border-radius: 6px;
-          padding: 10px;
-          margin-bottom: 8px;
+          padding: 12px;
+          margin-bottom: 10px;
         }
         .epic-summary-text {
-          font-size: 10px;
+          font-size: 11px;
           color: #374151;
-          line-height: 1.5;
+          line-height: 1.6;
         }
         .epic-tasks-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-          margin-top: 8px;
+          margin-top: 10px;
         }
         .task-chip {
-          font-family: 'SF Mono', Monaco, monospace;
-          font-size: 8px;
+          font-family: 'SF Mono', Monaco, Consolas, monospace;
+          font-size: 9px;
           background: #e2e8f0;
           color: #475569;
-          padding: 2px 6px;
-          border-radius: 3px;
+          padding: 3px 8px;
+          border-radius: 4px;
+          display: inline-block;
+          margin: 2px 4px 2px 0;
+        }
+        .task-chip a {
+          color: #6366f1;
+          text-decoration: none;
         }
         
         /* Task (for detailed report) */
         .task {
           border: 1px solid #e2e8f0;
-          border-radius: 5px;
-          padding: 7px 9px;
-          margin-bottom: 5px;
+          border-radius: 6px;
+          padding: 10px 12px;
+          margin-bottom: 8px;
           background: #fff;
         }
         .task-header {
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: 8px;
           flex-wrap: wrap;
         }
         .task-key {
-          font-family: 'SF Mono', Monaco, monospace;
-          font-size: 8px;
+          font-family: 'SF Mono', Monaco, Consolas, monospace;
+          font-size: 10px;
           color: #6366f1;
           font-weight: 500;
           text-decoration: none;
         }
-        .task-key:hover {
-          text-decoration: underline;
-        }
-        .task-chip a {
-          color: inherit;
-          text-decoration: none;
-        }
-        .task-chip a:hover {
-          text-decoration: underline;
-        }
         .task-title {
           font-weight: 500;
-          font-size: 9px;
+          font-size: 11px;
           color: #1e293b;
           flex: 1;
         }
         
         /* Status Labels */
         .label {
-          font-size: 6px;
+          font-size: 8px;
           font-weight: 600;
-          padding: 2px 5px;
-          border-radius: 3px;
+          padding: 3px 6px;
+          border-radius: 4px;
           text-transform: uppercase;
           letter-spacing: 0.3px;
+          display: inline-block;
         }
         .label-complete {
           background: #dcfce7;
@@ -224,102 +214,98 @@ function generateReportHTML(
         
         /* Task Content */
         .task-description {
-          font-size: 8px;
+          font-size: 10px;
           color: #475569;
-          margin-top: 5px;
-          line-height: 1.4;
-          padding-left: 6px;
-          border-left: 2px solid #e2e8f0;
+          margin-top: 8px;
+          line-height: 1.5;
+          padding-left: 10px;
+          border-left: 3px solid #e2e8f0;
         }
         .task-comments {
-          font-size: 8px;
+          font-size: 10px;
           color: #64748b;
-          margin-top: 5px;
-          padding: 4px 6px;
+          margin-top: 8px;
+          padding: 8px 10px;
           background: #f8fafc;
-          border-radius: 3px;
+          border-radius: 4px;
           font-style: italic;
         }
         .task-meta {
-          font-size: 7px;
+          font-size: 9px;
           color: #94a3b8;
-          margin-top: 5px;
-          display: flex;
-          gap: 10px;
+          margin-top: 8px;
         }
         
         /* Images */
         .images {
-          margin-top: 6px;
-          display: flex;
-          gap: 3px;
-          flex-wrap: wrap;
+          margin-top: 10px;
         }
         .image-thumb {
-          width: 36px;
-          height: 36px;
-          border-radius: 3px;
+          width: 48px;
+          height: 48px;
+          border-radius: 4px;
           object-fit: cover;
           border: 1px solid #e2e8f0;
+          display: inline-block;
+          margin: 2px;
         }
         .image-placeholder {
-          width: 36px;
-          height: 36px;
-          border-radius: 3px;
+          width: 48px;
+          height: 48px;
+          border-radius: 4px;
           background: #f1f5f9;
-          display: flex;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 7px;
+          font-size: 9px;
           color: #64748b;
           border: 1px solid #e2e8f0;
         }
         
         /* Legend */
         .legend {
-          margin-top: 24px;
-          padding: 12px;
+          margin-top: 30px;
+          padding: 16px;
           background: #f8fafc;
           border: 1px solid #e2e8f0;
-          border-radius: 6px;
+          border-radius: 8px;
           page-break-inside: avoid;
         }
         .legend-title {
-          font-size: 10px;
+          font-size: 12px;
           font-weight: 600;
           color: #1e293b;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
         }
-        .legend-items {
+        .legend-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 8px;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
         }
         .legend-item {
           display: flex;
-          align-items: flex-start;
-          gap: 6px;
+          align-items: center;
+          gap: 8px;
         }
-        .legend-item .label { flex-shrink: 0; }
         .legend-item-text {
-          font-size: 8px;
+          font-size: 9px;
           color: #475569;
-          line-height: 1.3;
         }
         
         /* Footer */
         .footer {
-          margin-top: 20px;
-          padding-top: 10px;
+          margin-top: 24px;
+          padding-top: 12px;
           border-top: 1px solid #e2e8f0;
           text-align: center;
-          font-size: 7px;
+          font-size: 9px;
           color: #94a3b8;
         }
         
         @media print {
-          body { padding: 12px; }
+          body { padding: 16px; }
           .sprint { page-break-inside: avoid; }
+          a { color: #6366f1 !important; }
         }
       </style>
     </head>
@@ -339,14 +325,12 @@ function generateReportHTML(
     html += `
       <div class="sprint">
         <div class="sprint-header">
-          <div class="sprint-title">
-            🏃 ${report.sprint.name}
-          </div>
+          <div class="sprint-title">🏃 ${report.sprint.name}</div>
           <div class="sprint-meta">
             ${report.sprint.startDate && report.sprint.endDate 
-              ? `📅 ${formatDate(report.sprint.startDate)} → ${formatDate(report.sprint.endDate)}` 
+              ? `📅 ${formatDate(report.sprint.startDate)} → ${formatDate(report.sprint.endDate)} • ` 
               : ''}
-            &nbsp;•&nbsp; 📋 ${taskCount} tasks
+            📋 ${taskCount} tasks
           </div>
           <div class="sprint-stats">
             <div class="stat-box">
@@ -383,7 +367,7 @@ function generateReportHTML(
         <div class="epic-group">
           <div class="epic-header">
             ${group.epic 
-              ? `<div class="epic-color" style="background: ${group.epic.color}"></div>
+              ? `<span class="epic-color" style="background: ${group.epic.color}"></span>
                  <span class="epic-name">${group.epic.name}</span>`
               : `<span class="epic-name" style="color: #64748b;">📁 Uncategorized</span>`
             }
@@ -402,7 +386,7 @@ function generateReportHTML(
                 </div>`
             }
             <div class="epic-tasks-list">
-              ${group.tasks.map((t: any) => `<span class="task-chip"><a href="${getTaskUrl(t.id)}" target="_blank">${t.taskKey}</a></span>`).join('')}
+              ${group.tasks.map((t: any) => `<span class="task-chip"><a href="${getTaskUrl(t.id)}">${t.taskKey}</a></span>`).join('')}
             </div>
           </div>
         `
@@ -417,7 +401,7 @@ function generateReportHTML(
           html += `
             <div class="task">
               <div class="task-header">
-                <a href="${getTaskUrl(task.id)}" target="_blank" class="task-key">${task.taskKey}</a>
+                <a href="${getTaskUrl(task.id)}" class="task-key">${task.taskKey}</a>
                 <span class="task-title">${task.title}</span>
           `
           
@@ -450,7 +434,7 @@ function generateReportHTML(
           if (task.sprintCount > 1) metaParts.push(`🔄 ${task.sprintCount} sprints`)
           
           if (metaParts.length > 0) {
-            html += `<div class="task-meta">${metaParts.join(' &nbsp;•&nbsp; ')}</div>`
+            html += `<div class="task-meta">${metaParts.join(' • ')}</div>`
           }
 
           if (opts.includeImages && task.attachments && task.attachments.length > 0) {
@@ -459,11 +443,11 @@ function generateReportHTML(
               if (att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
                 html += `<img class="image-thumb" src="${att.url}" alt="" />`
               } else {
-                html += `<div class="image-placeholder">📄</div>`
+                html += `<span class="image-placeholder">📄</span>`
               }
             }
             if (task.attachments.length > 6) {
-              html += `<div class="image-placeholder">+${task.attachments.length - 6}</div>`
+              html += `<span class="image-placeholder">+${task.attachments.length - 6}</span>`
             }
             html += `</div>`
           }
@@ -483,22 +467,22 @@ function generateReportHTML(
     html += `
       <div class="legend">
         <div class="legend-title">📖 Legend</div>
-        <div class="legend-items">
+        <div class="legend-grid">
           <div class="legend-item">
             <span class="label label-complete">✓ Complete</span>
-            <span class="legend-item-text">Task fully completed this sprint</span>
+            <span class="legend-item-text">Task fully completed</span>
           </div>
           <div class="legend-item">
             <span class="label label-carried">→ Carried</span>
-            <span class="legend-item-text">Continues in next sprint</span>
+            <span class="legend-item-text">Continues next sprint</span>
           </div>
           <div class="legend-item">
             <span class="label label-split">⇅ Split</span>
-            <span class="legend-item-text">Task was split to track ongoing work</span>
+            <span class="legend-item-text">Task was split</span>
           </div>
           <div class="legend-item">
             <span class="label label-continuation">↳ Continuation</span>
-            <span class="legend-item-text">Continues from a split task</span>
+            <span class="legend-item-text">From a split task</span>
           </div>
         </div>
       </div>
@@ -521,7 +505,7 @@ export async function POST(request: NextRequest) {
     await requireAuth()
 
     const body = await request.json()
-    const { reports, taskOptions = {}, reportType = 'detailed' } = body
+    const { reports, taskOptions = {}, reportType = 'detailed', format = 'html' } = body
 
     if (!reports || reports.length === 0) {
       return NextResponse.json({ error: 'No report data' }, { status: 400 })
@@ -533,13 +517,62 @@ export async function POST(request: NextRequest) {
 
     const html = generateReportHTML(reports, taskOptions, reportType, baseUrl)
 
+    // If PDF format requested, use puppeteer
+    if (format === 'pdf') {
+      try {
+        // Dynamic import for puppeteer
+        let browser
+        
+        if (process.env.NODE_ENV === 'production') {
+          // Production: use @sparticuz/chromium
+          const chromium = await import('@sparticuz/chromium')
+          const puppeteer = await import('puppeteer-core')
+          
+          browser = await puppeteer.default.launch({
+            args: chromium.default.args,
+            defaultViewport: chromium.default.defaultViewport,
+            executablePath: await chromium.default.executablePath(),
+            headless: true,
+          })
+        } else {
+          // Development: use regular puppeteer
+          const puppeteer = await import('puppeteer')
+          browser = await puppeteer.default.launch({
+            headless: true,
+          })
+        }
+
+        const page = await browser.newPage()
+        await page.setContent(html, { waitUntil: 'networkidle0' })
+        
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+        })
+
+        await browser.close()
+
+        return new NextResponse(pdfBuffer, {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf"`,
+          },
+        })
+      } catch (pdfError) {
+        console.error('PDF generation failed, falling back to HTML:', pdfError)
+        // Fall back to HTML if PDF generation fails
+      }
+    }
+
+    // Return HTML (default)
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html',
       },
     })
   } catch (error) {
-    console.error('Failed to generate PDF:', error)
+    console.error('Failed to generate report:', error)
     if ((error as Error).message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
