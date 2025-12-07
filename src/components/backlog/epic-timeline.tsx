@@ -118,17 +118,21 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
     }
 
     // Otherwise, calculate from tasks' sprint dates
-    let minDate: Date | null = null
-    let maxDate: Date | null = null
+    let minDate: Date | undefined = undefined
+    let maxDate: Date | undefined = undefined
 
     (epic.tasks || []).forEach((task: any) => {
       if (task.sprint?.startDate) {
         const sprintStart = new Date(task.sprint.startDate)
-        if (!minDate || sprintStart < minDate) minDate = sprintStart
+        if (minDate === undefined || sprintStart.getTime() < minDate.getTime()) {
+          minDate = sprintStart
+        }
       }
       if (task.sprint?.endDate) {
         const sprintEnd = new Date(task.sprint.endDate)
-        if (!maxDate || sprintEnd > maxDate) maxDate = sprintEnd
+        if (maxDate === undefined || sprintEnd.getTime() > maxDate.getTime()) {
+          maxDate = sprintEnd
+        }
       }
     })
 
