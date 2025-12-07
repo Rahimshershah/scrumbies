@@ -283,13 +283,13 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       </div>
 
       {/* Epic dropdown - positioned more centrally with spacing */}
-      <div className="w-44 flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
+      <div className="min-w-[180px] flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-full text-left hover:opacity-80 transition-opacity">
+            <button className="text-left hover:opacity-80 transition-opacity">
               {task.epic ? (
                 <Badge 
-                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer")}
+                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer whitespace-nowrap")}
                   style={{ 
                     backgroundColor: `${task.epic.color}20`, 
                     color: task.epic.color,
@@ -300,7 +300,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
                   {task.epic.name}
                 </Badge>
               ) : (
-                <Badge variant="outline" className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer px-2.5 py-1 border-dashed")}>
+                <Badge variant="outline" className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer px-2.5 py-1 border-dashed whitespace-nowrap")}>
                   No Epic
                 </Badge>
               )}
