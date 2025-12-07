@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth-utils'
 function generateReportHTML(
   reports: any[], 
   taskOptions: Record<string, { includeImages: boolean }>,
-  reportType: 'detailed' | 'summarized'
+  reportType: 'detailed' | 'summarized',
+  baseUrl: string
 ) {
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', { 
@@ -13,6 +14,8 @@ function generateReportHTML(
       year: 'numeric'
     })
   }
+  
+  const getTaskUrl = (taskId: string) => `${baseUrl}?task=${taskId}`
 
   let html = `
     <!DOCTYPE html>
@@ -170,6 +173,17 @@ function generateReportHTML(
           font-size: 8px;
           color: #6366f1;
           font-weight: 500;
+          text-decoration: none;
+        }
+        .task-key:hover {
+          text-decoration: underline;
+        }
+        .task-chip a {
+          color: inherit;
+          text-decoration: none;
+        }
+        .task-chip a:hover {
+          text-decoration: underline;
         }
         .task-title {
           font-weight: 500;
@@ -388,7 +402,7 @@ function generateReportHTML(
                 </div>`
             }
             <div class="epic-tasks-list">
-              ${group.tasks.map((t: any) => `<span class="task-chip">${t.taskKey}</span>`).join('')}
+              ${group.tasks.map((t: any) => `<span class="task-chip"><a href="${getTaskUrl(t.id)}" target="_blank">${t.taskKey}</a></span>`).join('')}
             </div>
           </div>
         `
@@ -403,7 +417,7 @@ function generateReportHTML(
           html += `
             <div class="task">
               <div class="task-header">
-                <span class="task-key">${task.taskKey}</span>
+                <a href="${getTaskUrl(task.id)}" target="_blank" class="task-key">${task.taskKey}</a>
                 <span class="task-title">${task.title}</span>
           `
           
@@ -513,7 +527,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No report data' }, { status: 400 })
     }
 
-    const html = generateReportHTML(reports, taskOptions, reportType)
+    // Get base URL from request
+    const url = new URL(request.url)
+    const baseUrl = `${url.protocol}//${url.host}`
+
+    const html = generateReportHTML(reports, taskOptions, reportType, baseUrl)
 
     return new NextResponse(html, {
       headers: {

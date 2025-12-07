@@ -109,55 +109,71 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
       if (res.ok) {
         const html = await res.text()
         
-        // Dynamically import html2pdf
-        const html2pdf = (await import('html2pdf.js')).default
+        // Dynamically import jsPDF and html2canvas
+        const { default: jsPDF } = await import('jspdf')
+        const { default: html2canvas } = await import('html2canvas')
         
-        // Parse the HTML and extract styles + body content
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(html, 'text/html')
+        // Create an iframe to render the HTML properly
+        const iframe = document.createElement('iframe')
+        iframe.style.position = 'absolute'
+        iframe.style.left = '-9999px'
+        iframe.style.width = '800px'
+        iframe.style.height = '1200px'
+        document.body.appendChild(iframe)
         
-        // Create a container with the styles and body content
-        const container = document.createElement('div')
-        
-        // Copy styles
-        const styles = doc.querySelectorAll('style')
-        styles.forEach(style => {
-          const newStyle = document.createElement('style')
-          newStyle.textContent = style.textContent
-          container.appendChild(newStyle)
-        })
-        
-        // Copy body content
-        const bodyContent = doc.body.innerHTML
-        const contentDiv = document.createElement('div')
-        contentDiv.innerHTML = bodyContent
-        container.appendChild(contentDiv)
-        
-        // Add to DOM temporarily
-        container.style.position = 'absolute'
-        container.style.left = '-9999px'
-        container.style.width = '210mm' // A4 width
-        document.body.appendChild(container)
-        
-        // Generate PDF
-        const opt = {
-          margin: [10, 10, 10, 10],
-          filename: `sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { 
-            scale: 2, 
-            useCORS: true,
-            logging: false,
-            windowWidth: 794, // A4 at 96dpi
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['avoid-all'], before: ['.sprint'] }
+        // Write HTML to iframe
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+        if (!iframeDoc) {
+          throw new Error('Failed to create iframe document')
         }
         
-        await html2pdf().set(opt).from(container).save()
+        iframeDoc.open()
+        iframeDoc.write(html)
+        iframeDoc.close()
+        
+        // Wait for content to render
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Get the body element from iframe
+        const element = iframeDoc.body
+        
+        // Create canvas from the content
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: 800,
+          windowWidth: 800,
+        })
+        
+        // Calculate dimensions
+        const imgWidth = 210 // A4 width in mm
+        const pageHeight = 297 // A4 height in mm
+        const imgHeight = (canvas.height * imgWidth) / canvas.width
+        let heightLeft = imgHeight
+        let position = 0
+        
+        // Create PDF
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const imgData = canvas.toDataURL('image/jpeg', 0.95)
+        
+        // Add first page
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+        
+        // Add additional pages if needed
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight
+          pdf.addPage()
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+          heightLeft -= pageHeight
+        }
+        
+        // Save PDF
+        pdf.save(`sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`)
         
         // Cleanup
-        document.body.removeChild(container)
+        document.body.removeChild(iframe)
       }
     } catch (error) {
       console.error('Failed to download PDF:', error)
