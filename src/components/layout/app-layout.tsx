@@ -21,8 +21,8 @@ interface AppLayoutProps {
   onSprintSelect: (sprint: Sprint | null) => void
   currentUser?: { id: string; role: string }
   onSprintReactivate?: (sprintId: string) => void
-  currentView?: 'backlog' | 'epics' | 'spaces'
-  onViewChange?: (view: 'backlog' | 'epics' | 'spaces') => void
+  currentView?: 'backlog' | 'epics' | 'reports' | 'spaces'
+  onViewChange?: (view: 'backlog' | 'epics' | 'reports' | 'spaces') => void
 }
 
 function formatDate(dateString: string | null | undefined) {
@@ -85,8 +85,8 @@ function Sidebar({
   onSprintSelect: (sprint: Sprint | null) => void
   currentUser?: { id: string; role: string }
   onSprintReactivate?: (sprintId: string) => void
-  currentView?: 'backlog' | 'epics' | 'spaces'
-  onViewChange?: (view: 'backlog' | 'epics' | 'spaces') => void
+  currentView?: 'backlog' | 'epics' | 'reports' | 'spaces'
+  onViewChange?: (view: 'backlog' | 'epics' | 'reports' | 'spaces') => void
   className?: string
 }) {
   const isAdmin = currentUser?.role === 'ADMIN'
@@ -116,6 +116,16 @@ function Sidebar({
           label="Epics"
           active={currentView === 'epics'}
           onClick={() => onViewChange?.('epics')}
+        />
+        <NavItem
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          }
+          label="Reports"
+          active={currentView === 'reports'}
+          onClick={() => onViewChange?.('reports')}
         />
       </div>
 

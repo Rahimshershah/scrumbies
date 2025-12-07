@@ -5,12 +5,13 @@ import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { BacklogView } from '@/components/backlog/backlog-view'
 import { SpacesView } from '@/components/spaces'
+import { ReportsView } from '@/components/reports/reports-view'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
 import { RowHeightProvider } from '@/contexts/row-height-context'
 import { Project, Sprint, Task, Epic } from '@/types'
 
-export type AppView = 'backlog' | 'epics' | 'spaces'
+export type AppView = 'backlog' | 'epics' | 'reports' | 'spaces'
 
 interface AppShellProps {
   user: {
@@ -56,7 +57,7 @@ export function AppShell({
   // Restore view from localStorage on mount
   useEffect(() => {
     const savedView = localStorage.getItem('scrumbies_current_view') as AppView | null
-    if (savedView && (savedView === 'backlog' || savedView === 'epics' || savedView === 'spaces')) {
+    if (savedView && (savedView === 'backlog' || savedView === 'epics' || savedView === 'reports' || savedView === 'spaces')) {
       setCurrentView(savedView)
     }
   }, [])
@@ -261,6 +262,12 @@ export function AppShell({
             projectId={effectiveProjectId}
             onOpenDocument={handleOpenDocument}
             taskToOpen={taskToOpen}
+          />
+        ) : currentView === 'reports' ? (
+          <ReportsView
+            projectId={effectiveProjectId}
+            sprints={sprints}
+            epics={epics}
           />
         ) : (
           <SpacesView
