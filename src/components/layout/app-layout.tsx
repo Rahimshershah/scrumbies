@@ -21,6 +21,8 @@ interface AppLayoutProps {
   onSprintSelect: (sprint: Sprint | null) => void
   currentUser?: { id: string; role: string }
   onSprintReactivate?: (sprintId: string) => void
+  currentView?: 'backlog' | 'epics' | 'spaces'
+  onViewChange?: (view: 'backlog' | 'epics' | 'spaces') => void
 }
 
 function formatDate(dateString: string | null | undefined) {
@@ -73,6 +75,8 @@ function Sidebar({
   onSprintSelect,
   currentUser,
   onSprintReactivate,
+  currentView,
+  onViewChange,
   className 
 }: {
   activeSprint?: Sprint | null
@@ -81,6 +85,8 @@ function Sidebar({
   onSprintSelect: (sprint: Sprint | null) => void
   currentUser?: { id: string; role: string }
   onSprintReactivate?: (sprintId: string) => void
+  currentView?: 'backlog' | 'epics' | 'spaces'
+  onViewChange?: (view: 'backlog' | 'epics' | 'spaces') => void
   className?: string
 }) {
   const isAdmin = currentUser?.role === 'ADMIN'
@@ -95,8 +101,21 @@ function Sidebar({
             </svg>
           }
           label="Backlog"
-          active={!selectedSprint}
-          onClick={() => onSprintSelect(null)}
+          active={!selectedSprint && currentView === 'backlog'}
+          onClick={() => {
+            onSprintSelect(null)
+            onViewChange?.('backlog')
+          }}
+        />
+        <NavItem
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          }
+          label="Epics"
+          active={currentView === 'epics'}
+          onClick={() => onViewChange?.('epics')}
         />
       </div>
 
@@ -204,6 +223,8 @@ export function AppLayout({
   onSprintSelect,
   currentUser,
   onSprintReactivate,
+  currentView = 'backlog',
+  onViewChange,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -218,6 +239,8 @@ export function AppLayout({
           onSprintSelect={onSprintSelect}
           currentUser={currentUser}
           onSprintReactivate={onSprintReactivate}
+          currentView={currentView}
+          onViewChange={onViewChange}
           className="w-full h-full" 
         />
       </aside>
@@ -247,6 +270,11 @@ export function AppLayout({
             }}
             currentUser={currentUser}
             onSprintReactivate={onSprintReactivate}
+            currentView={currentView}
+            onViewChange={(view) => {
+              onViewChange?.(view)
+              setSidebarOpen(false)
+            }}
           />
         </SheetContent>
       </Sheet>

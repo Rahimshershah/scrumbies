@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/header'
 import { BacklogView } from '@/components/backlog/backlog-view'
-import { EpicTimeline } from '@/components/backlog/epic-timeline'
 import { SpacesView } from '@/components/spaces'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
@@ -252,7 +251,7 @@ export function AppShell({
             </div>
           </div>
         )}
-        {currentView === 'backlog' ? (
+        {currentView === 'backlog' || currentView === 'epics' ? (
           <BacklogView
             initialSprints={sprints}
             initialBacklog={backlogTasks}
@@ -262,19 +261,6 @@ export function AppShell({
             projectId={effectiveProjectId}
             onOpenDocument={handleOpenDocument}
             taskToOpen={taskToOpen}
-          />
-        ) : currentView === 'epics' ? (
-          <EpicTimeline
-            epics={epics}
-            sprints={sprints}
-            onBack={() => handleViewChange('backlog')}
-            onTaskClick={(task) => {
-              setTaskToOpen(task.id)
-              handleViewChange('backlog')
-            }}
-            onEpicClick={() => {
-              // Stay in epics view
-            }}
           />
         ) : (
           <SpacesView

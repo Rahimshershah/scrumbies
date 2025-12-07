@@ -687,6 +687,14 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       onSprintSelect={setViewingSprint}
       currentUser={currentUser}
       onSprintReactivate={handleSprintReactivate}
+      currentView={viewingTimeline ? 'epics' : 'backlog'}
+      onViewChange={(view) => {
+        if (view === 'epics') {
+          setViewingTimeline(true)
+        } else {
+          setViewingTimeline(false)
+        }
+      }}
     >
       <div className="flex h-full">
         {/* Epic Panel - Timeline view */}
