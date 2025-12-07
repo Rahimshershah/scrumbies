@@ -118,38 +118,41 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
     }
 
     // Otherwise, calculate from tasks' sprint dates
-    let minDate: Date | undefined = undefined
-    let maxDate: Date | undefined = undefined
+    const sprintDates: { start: Date, end: Date }[] = []
 
-    (epic.tasks || []).forEach((task: any) => {
-      if (task.sprint?.startDate) {
-        const sprintStart = new Date(task.sprint.startDate)
-        if (minDate === undefined || sprintStart.getTime() < minDate.getTime()) {
-          minDate = sprintStart
-        }
-      }
-      if (task.sprint?.endDate) {
-        const sprintEnd = new Date(task.sprint.endDate)
-        if (maxDate === undefined || sprintEnd.getTime() > maxDate.getTime()) {
-          maxDate = sprintEnd
-        }
+    ;(epic.tasks || []).forEach((task: any) => {
+      if (task.sprint?.startDate && task.sprint?.endDate) {
+        sprintDates.push({
+          start: new Date(task.sprint.startDate),
+          end: new Date(task.sprint.endDate)
+        })
       }
     })
 
+    if (sprintDates.length === 0) {
+      return {
+        start: epic.startDate || null,
+        end: epic.endDate || null
+      }
+    }
+
+    const minDate = sprintDates.reduce((min, d) => d.start < min ? d.start : min, sprintDates[0].start)
+    const maxDate = sprintDates.reduce((max, d) => d.end > max ? d.end : max, sprintDates[0].end)
+
     // If epic has start date but not end, use calculated end
-    if (epic.startDate && !epic.endDate && maxDate) {
+    if (epic.startDate && !epic.endDate) {
       return { start: epic.startDate, end: maxDate.toISOString() }
     }
 
     // If epic has end date but not start, use calculated start
-    if (!epic.startDate && epic.endDate && minDate) {
+    if (!epic.startDate && epic.endDate) {
       return { start: minDate.toISOString(), end: epic.endDate }
     }
 
     // Use fully calculated dates
     return {
-      start: minDate ? minDate.toISOString() : null,
-      end: maxDate ? maxDate.toISOString() : null
+      start: minDate.toISOString(),
+      end: maxDate.toISOString()
     }
   }
 
