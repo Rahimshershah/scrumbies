@@ -61,6 +61,12 @@ export async function POST(request: NextRequest) {
                 },
               },
             },
+            splitFrom: {
+              select: { id: true, taskKey: true, title: true },
+            },
+            splitTasks: {
+              select: { id: true, taskKey: true, title: true },
+            },
           },
         },
       },

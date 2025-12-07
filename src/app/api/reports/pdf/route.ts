@@ -10,6 +10,26 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
     })
   }
 
+  // Count task stats across all reports
+  let totalTasks = 0
+  let completedTasks = 0
+  let splitTasks = 0
+  let carriedTasks = 0
+
+  for (const report of reports) {
+    for (const group of report.tasksByEpic) {
+      for (const task of group.tasks) {
+        totalTasks++
+        const isComplete = task.status === 'DONE' || task.status === 'LIVE'
+        const isSplit = task.splitFromId || (task.splitTasks && task.splitTasks.length > 0)
+        
+        if (isComplete) completedTasks++
+        if (isSplit) splitTasks++
+        if (!isComplete) carriedTasks++
+      }
+    }
+  }
+
   let html = `
     <!DOCTYPE html>
     <html>
@@ -19,154 +39,281 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          font-size: 10px;
-          line-height: 1.4;
+          font-size: 9px;
+          line-height: 1.35;
           color: #1a1a1a;
-          padding: 20px;
+          padding: 24px;
+          background: #fff;
         }
-        .header {
-          text-align: center;
-          margin-bottom: 16px;
-          padding-bottom: 8px;
-          border-bottom: 2px solid #e5e5e5;
-        }
-        .header h1 { font-size: 16px; margin-bottom: 2px; }
-        .header p { color: #666; font-size: 8px; }
         
+        /* Sprint Section */
         .sprint {
-          margin-bottom: 16px;
+          margin-bottom: 24px;
           page-break-inside: avoid;
         }
         .sprint-header {
-          background: #f5f5f5;
-          padding: 8px 10px;
-          border-radius: 4px;
-          margin-bottom: 8px;
+          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+          color: white;
+          padding: 16px 20px;
+          border-radius: 8px 8px 0 0;
         }
-        .sprint-header h2 { font-size: 13px; margin-bottom: 2px; }
-        .sprint-header .meta { font-size: 8px; color: #666; }
+        .sprint-title {
+          font-size: 20px;
+          font-weight: 700;
+          margin-bottom: 4px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .sprint-title .icon { font-size: 18px; }
+        .sprint-meta {
+          font-size: 11px;
+          opacity: 0.85;
+          display: flex;
+          gap: 16px;
+          margin-top: 8px;
+        }
+        .sprint-meta span {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .sprint-stats {
+          display: flex;
+          gap: 12px;
+          margin-top: 12px;
+        }
+        .stat-box {
+          background: rgba(255,255,255,0.15);
+          padding: 6px 12px;
+          border-radius: 6px;
+          text-align: center;
+        }
+        .stat-number { font-size: 16px; font-weight: 700; }
+        .stat-label { font-size: 8px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
         
+        /* AI Summary */
         .ai-summary {
-          background: #f0f9ff;
-          border-left: 3px solid #0ea5e9;
-          padding: 6px 10px;
-          margin-bottom: 8px;
-          font-size: 9px;
+          background: #fefce8;
+          border: 1px solid #fde047;
+          border-top: none;
+          padding: 12px 16px;
+          font-size: 11px;
+          line-height: 1.5;
         }
-        .ai-summary .label { 
-          font-weight: 600; 
-          color: #0284c7; 
-          margin-bottom: 2px;
-          font-size: 8px;
+        .ai-summary-label {
+          font-weight: 600;
+          color: #a16207;
+          font-size: 10px;
+          margin-bottom: 4px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
         }
+        .ai-summary-text { color: #713f12; }
         
-        .epic-group { margin-bottom: 10px; }
+        /* Epic Group */
+        .epic-group {
+          border: 1px solid #e2e8f0;
+          border-top: none;
+          padding: 12px;
+          background: #fff;
+        }
+        .epic-group:last-child {
+          border-radius: 0 0 8px 8px;
+        }
         .epic-header {
           display: flex;
           align-items: center;
-          gap: 5px;
-          margin-bottom: 5px;
-          padding-bottom: 3px;
-          border-bottom: 1px solid #e5e5e5;
+          gap: 8px;
+          margin-bottom: 8px;
+          padding-bottom: 6px;
+          border-bottom: 1px dashed #e2e8f0;
         }
-        .epic-color { width: 8px; height: 8px; border-radius: 50%; }
-        .epic-name { font-weight: 600; font-size: 10px; }
-        .epic-count { 
-          font-size: 7px; 
-          color: #666; 
-          background: #f0f0f0;
-          padding: 1px 5px;
-          border-radius: 6px;
+        .epic-color {
+          width: 12px;
+          height: 12px;
+          border-radius: 3px;
+        }
+        .epic-name {
+          font-weight: 600;
+          font-size: 11px;
+          color: #1e293b;
+        }
+        .epic-count {
+          font-size: 9px;
+          color: #64748b;
+          background: #f1f5f9;
+          padding: 2px 8px;
+          border-radius: 10px;
         }
         
+        /* Task */
         .task {
-          padding: 5px 7px;
-          margin-bottom: 3px;
-          background: #fafafa;
-          border-radius: 3px;
-          border-left: 2px solid #22c55e;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          padding: 8px 10px;
+          margin-bottom: 6px;
+          background: #fff;
         }
-        .task.incomplete { border-left-color: #f59e0b; }
         .task-header {
           display: flex;
           align-items: center;
-          gap: 5px;
-          margin-bottom: 2px;
+          gap: 6px;
+          flex-wrap: wrap;
         }
-        .task-key { font-family: monospace; font-size: 8px; color: #6366f1; }
-        .task-title { font-weight: 500; font-size: 9px; }
-        .task-carried {
-          font-size: 6px;
-          background: #fef3c7;
-          color: #92400e;
-          padding: 1px 3px;
-          border-radius: 3px;
+        .task-key {
+          font-family: 'SF Mono', Monaco, monospace;
+          font-size: 9px;
+          color: #6366f1;
+          font-weight: 500;
         }
-        .task-description {
-          font-size: 8px;
-          color: #555;
-          margin-top: 2px;
-          line-height: 1.3;
-        }
-        .task-comments {
-          font-size: 8px;
-          color: #666;
-          font-style: italic;
-          margin-top: 3px;
-          padding-left: 6px;
-          border-left: 2px solid #ddd;
-        }
-        .task-meta {
-          font-size: 7px;
-          color: #888;
-          margin-top: 3px;
+        .task-title {
+          font-weight: 500;
+          font-size: 10px;
+          color: #1e293b;
+          flex: 1;
         }
         
-        .images {
-          margin-top: 4px;
+        /* Status Labels */
+        .label {
+          font-size: 7px;
+          font-weight: 600;
+          padding: 2px 6px;
+          border-radius: 3px;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+        .label-complete {
+          background: #dcfce7;
+          color: #166534;
+          border: 1px solid #bbf7d0;
+        }
+        .label-carried {
+          background: #fef3c7;
+          color: #92400e;
+          border: 1px solid #fde68a;
+        }
+        .label-split {
+          background: #e0e7ff;
+          color: #3730a3;
+          border: 1px solid #c7d2fe;
+        }
+        .label-continuation {
+          background: #f3e8ff;
+          color: #6b21a8;
+          border: 1px solid #e9d5ff;
+        }
+        
+        /* Task Content */
+        .task-description {
+          font-size: 9px;
+          color: #475569;
+          margin-top: 6px;
+          line-height: 1.4;
+          padding-left: 8px;
+          border-left: 2px solid #e2e8f0;
+        }
+        .task-comments {
+          font-size: 9px;
+          color: #64748b;
+          margin-top: 6px;
+          padding: 6px 8px;
+          background: #f8fafc;
+          border-radius: 4px;
+          font-style: italic;
+        }
+        .task-comments::before {
+          content: "💬 ";
+        }
+        .task-meta {
+          font-size: 8px;
+          color: #94a3b8;
+          margin-top: 6px;
           display: flex;
-          gap: 3px;
+          gap: 12px;
+        }
+        
+        /* Images */
+        .images {
+          margin-top: 8px;
+          display: flex;
+          gap: 4px;
           flex-wrap: wrap;
         }
         .image-thumb {
-          width: 32px;
-          height: 32px;
-          border-radius: 3px;
+          width: 40px;
+          height: 40px;
+          border-radius: 4px;
           object-fit: cover;
-          border: 1px solid #e5e5e5;
+          border: 1px solid #e2e8f0;
         }
         .image-placeholder {
-          width: 32px;
-          height: 32px;
-          border-radius: 3px;
-          background: #f0f0f0;
+          width: 40px;
+          height: 40px;
+          border-radius: 4px;
+          background: #f1f5f9;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 7px;
-          color: #666;
+          font-size: 8px;
+          color: #64748b;
+          border: 1px solid #e2e8f0;
         }
         
+        /* Legend */
+        .legend {
+          margin-top: 32px;
+          padding: 16px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          page-break-inside: avoid;
+        }
+        .legend-title {
+          font-size: 12px;
+          font-weight: 600;
+          color: #1e293b;
+          margin-bottom: 12px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .legend-items {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        .legend-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        }
+        .legend-item .label { flex-shrink: 0; }
+        .legend-item-text {
+          font-size: 9px;
+          color: #475569;
+          line-height: 1.4;
+        }
+        
+        /* Footer */
         .footer {
-          margin-top: 16px;
-          padding-top: 8px;
-          border-top: 1px solid #e5e5e5;
+          margin-top: 24px;
+          padding-top: 12px;
+          border-top: 1px solid #e2e8f0;
           text-align: center;
-          font-size: 7px;
-          color: #888;
+          font-size: 8px;
+          color: #94a3b8;
         }
         
         @media print {
-          body { padding: 10px; }
+          body { padding: 16px; }
           .sprint { page-break-inside: avoid; }
+          .legend { page-break-inside: avoid; }
         }
       </style>
     </head>
     <body>
-      <div class="header">
-        <h1>Sprint Report</h1>
-        <p>Generated on ${formatDate(new Date().toISOString())}</p>
-      </div>
   `
 
   for (const report of reports) {
@@ -174,16 +321,41 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
     const completedCount = report.tasksByEpic.reduce((sum: number, e: any) => 
       sum + e.tasks.filter((t: any) => t.status === 'DONE' || t.status === 'LIVE').length, 0
     )
+    const splitCount = report.tasksByEpic.reduce((sum: number, e: any) => 
+      sum + e.tasks.filter((t: any) => t.splitFromId || (t.splitTasks && t.splitTasks.length > 0)).length, 0
+    )
+    const carriedCount = taskCount - completedCount
 
     html += `
       <div class="sprint">
         <div class="sprint-header">
-          <h2>${report.sprint.name}</h2>
-          <div class="meta">
+          <div class="sprint-title">
+            <span class="icon">🏃</span>
+            ${report.sprint.name}
+          </div>
+          <div class="sprint-meta">
             ${report.sprint.startDate && report.sprint.endDate 
-              ? `${formatDate(report.sprint.startDate)} - ${formatDate(report.sprint.endDate)} • ` 
+              ? `<span>📅 ${formatDate(report.sprint.startDate)} → ${formatDate(report.sprint.endDate)}</span>` 
               : ''}
-            ${completedCount}/${taskCount} tasks completed
+            <span>📋 ${taskCount} tasks</span>
+          </div>
+          <div class="sprint-stats">
+            <div class="stat-box">
+              <div class="stat-number">${completedCount}</div>
+              <div class="stat-label">Completed</div>
+            </div>
+            ${splitCount > 0 ? `
+            <div class="stat-box">
+              <div class="stat-number">${splitCount}</div>
+              <div class="stat-label">Split/Cont.</div>
+            </div>
+            ` : ''}
+            ${carriedCount > 0 ? `
+            <div class="stat-box">
+              <div class="stat-number">${carriedCount}</div>
+              <div class="stat-label">Carried Over</div>
+            </div>
+            ` : ''}
           </div>
         </div>
     `
@@ -191,8 +363,8 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
     if (report.aiSummary) {
       html += `
         <div class="ai-summary">
-          <div class="label">⚡ Sprint Summary</div>
-          <div>${report.aiSummary}</div>
+          <div class="ai-summary-label">⚡ AI Sprint Summary</div>
+          <div class="ai-summary-text">${report.aiSummary}</div>
         </div>
       `
     }
@@ -204,24 +376,41 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
             ${group.epic 
               ? `<div class="epic-color" style="background: ${group.epic.color}"></div>
                  <span class="epic-name">${group.epic.name}</span>`
-              : `<span class="epic-name" style="color: #888; font-style: italic;">No Epic</span>`
+              : `<span class="epic-name" style="color: #64748b;">📁 Uncategorized</span>`
             }
-            <span class="epic-count">${group.tasks.length}</span>
+            <span class="epic-count">${group.tasks.length} task${group.tasks.length !== 1 ? 's' : ''}</span>
           </div>
       `
 
       for (const task of group.tasks) {
         const isComplete = task.status === 'DONE' || task.status === 'LIVE'
+        const isSplitFrom = !!task.splitFromId // This task is a continuation
+        const hasSplitTasks = task.splitTasks && task.splitTasks.length > 0 // This task was split
         const opts = taskOptions[task.id] || { includeImages: false }
 
         html += `
-          <div class="task ${isComplete ? '' : 'incomplete'}">
+          <div class="task">
             <div class="task-header">
               <span class="task-key">${task.taskKey}</span>
               <span class="task-title">${task.title}</span>
-              ${!isComplete ? '<span class="task-carried">Carried</span>' : ''}
-            </div>
         `
+        
+        // Add status labels
+        if (isComplete) {
+          html += `<span class="label label-complete">✓ Complete</span>`
+        } else {
+          html += `<span class="label label-carried">→ Carried</span>`
+        }
+        
+        if (isSplitFrom) {
+          html += `<span class="label label-continuation">↳ Continuation</span>`
+        }
+        
+        if (hasSplitTasks) {
+          html += `<span class="label label-split">⇅ Split</span>`
+        }
+
+        html += `</div>` // Close task-header
 
         // AI Description summary
         if (task.aiDescriptionSummary) {
@@ -230,30 +419,30 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
 
         // AI Comments summary
         if (task.aiCommentsSummary) {
-          html += `<div class="task-comments">💬 ${task.aiCommentsSummary}</div>`
+          html += `<div class="task-comments">${task.aiCommentsSummary}</div>`
         }
 
         // Meta info
         const metaParts = []
         if (task.assignee) metaParts.push(`👤 ${task.assignee.name}`)
-        if (task.sprintCount > 1) metaParts.push(`🔄 ${task.sprintCount} sprints`)
+        if (task.sprintCount > 1) metaParts.push(`🔄 Across ${task.sprintCount} sprints`)
         
         if (metaParts.length > 0) {
-          html += `<div class="task-meta">${metaParts.join(' • ')}</div>`
+          html += `<div class="task-meta">${metaParts.join(' &nbsp;•&nbsp; ')}</div>`
         }
 
         // Images if enabled
         if (opts.includeImages && task.attachments && task.attachments.length > 0) {
           html += `<div class="images">`
-          for (const att of task.attachments.slice(0, 4)) {
+          for (const att of task.attachments.slice(0, 6)) {
             if (att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
               html += `<img class="image-thumb" src="${att.url}" alt="" />`
             } else {
               html += `<div class="image-placeholder">📄</div>`
             }
           }
-          if (task.attachments.length > 4) {
-            html += `<div class="image-placeholder">+${task.attachments.length - 4}</div>`
+          if (task.attachments.length > 6) {
+            html += `<div class="image-placeholder">+${task.attachments.length - 6}</div>`
           }
           html += `</div>`
         }
@@ -267,9 +456,34 @@ function generateReportHTML(reports: any[], taskOptions: Record<string, { includ
     html += `</div>` // Close sprint
   }
 
+  // Add Legend
+  html += `
+    <div class="legend">
+      <div class="legend-title">📖 Report Legend</div>
+      <div class="legend-items">
+        <div class="legend-item">
+          <span class="label label-complete">✓ Complete</span>
+          <span class="legend-item-text">Task was fully completed during this sprint</span>
+        </div>
+        <div class="legend-item">
+          <span class="label label-carried">→ Carried</span>
+          <span class="legend-item-text">Task was not completed and will continue in next sprint</span>
+        </div>
+        <div class="legend-item">
+          <span class="label label-split">⇅ Split</span>
+          <span class="legend-item-text">Task was split into continuation tasks to track ongoing work</span>
+        </div>
+        <div class="legend-item">
+          <span class="label label-continuation">↳ Continuation</span>
+          <span class="legend-item-text">This task continues work from a previous split task</span>
+        </div>
+      </div>
+    </div>
+  `
+
   html += `
       <div class="footer">
-        Generated by Scrumbies • ${new Date().toISOString()}
+        Sprint Report • Generated by Scrumbies • ${formatDate(new Date().toISOString())}
       </div>
     </body>
     </html>
