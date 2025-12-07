@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Sprint, Task } from '@/types'
+import { Sprint, Task, Epic } from '@/types'
 import { TaskCard } from './task-card'
 import { InlineTaskInput } from './inline-task-input'
 import { EditSprintModal } from './edit-sprint-modal'
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 interface SprintSectionProps {
   sprint: Sprint
   users: { id: string; name: string; avatarUrl?: string | null }[]
+  epics?: Epic[]
   availableSprints?: Sprint[] // For complete modal - planned sprints
   projectId?: string
   onTaskClick: (task: Task) => void
@@ -44,6 +45,7 @@ function formatDate(dateString: string | null | undefined) {
 export function SprintSection({
   sprint,
   users,
+  epics = [],
   availableSprints = [],
   projectId,
   onTaskClick,
@@ -267,6 +269,7 @@ export function SprintSection({
                 key={task.id}
                 task={task}
                 users={users}
+                epics={epics}
                 onClick={() => onTaskClick(task)}
                 onUpdate={onTaskUpdate}
                 isActive={selectedTaskId === task.id}

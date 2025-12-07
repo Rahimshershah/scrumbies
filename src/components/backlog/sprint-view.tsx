@@ -41,6 +41,7 @@ interface SprintViewProps {
   sprint: Sprint
   users: { id: string; name: string; avatarUrl?: string | null }[]
   allSprints: Sprint[]
+  epics?: Epic[]
   currentUser?: { id: string; role: string }
   projectId?: string
   onBack: () => void
@@ -64,7 +65,7 @@ function formatDate(dateString: string | null | undefined) {
   return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// Sortable Task Row Component
+// Sortable Task Row Component with Inline Editing
 function SortableTaskRow({ 
   task, 
   onClick,
@@ -73,6 +74,9 @@ function SortableTaskRow({
   isActive,
   onSelect,
   index,
+  users,
+  epics,
+  onInlineUpdate,
 }: { 
   task: Task
   onClick: () => void
@@ -81,8 +85,11 @@ function SortableTaskRow({
   isActive: boolean
   onSelect: (e: React.MouseEvent, index: number) => void
   index: number
+  users: { id: string; name: string; avatarUrl?: string | null }[]
+  epics: Epic[]
+  onInlineUpdate: (taskId: string, field: string, value: string | null) => Promise<void>
 }) {
-  const { getStatusConfig, getTeamConfig } = useProjectSettings()
+  const { statuses, teams, getStatusConfig, getTeamConfig } = useProjectSettings()
   const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
     attributes,
@@ -131,7 +138,7 @@ function SortableTaskRow({
         }
       }}
       className={cn(
-        "flex items-center gap-4 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
+        "flex items-center gap-3 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
         getRowHeightClass(),
         canEdit && "active:cursor-grabbing",
         isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing",
@@ -150,18 +157,41 @@ function SortableTaskRow({
         </div>
       )}
 
-      {/* Team */}
-      <div className="w-20 flex-shrink-0">
-        {teamStyle ? (
-          <Badge 
-            className={cn(getTextSize('xs'), "font-semibold px-2 py-0.5")}
-            style={{ backgroundColor: teamStyle.bgColor, color: teamStyle.color }}
-          >
-            {teamStyle.shortLabel}
-          </Badge>
-        ) : (
-          <span className={cn(getTextSize('xs'), "text-muted-foreground")}>—</span>
-        )}
+      {/* Team - Inline Dropdown */}
+      <div className="w-20 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full text-left hover:opacity-80 transition-opacity">
+              {teamStyle ? (
+                <Badge 
+                  className={cn(getTextSize('xs'), "font-semibold px-2 py-0.5 cursor-pointer")}
+                  style={{ backgroundColor: teamStyle.bgColor, color: teamStyle.color }}
+                >
+                  {teamStyle.shortLabel}
+                </Badge>
+              ) : (
+                <span className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer")}>—</span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-36">
+            <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'team', null)}>
+              <span className="text-muted-foreground">No Team</span>
+            </DropdownMenuItem>
+            {teams.map((team) => (
+              <DropdownMenuItem 
+                key={team.key} 
+                onClick={() => onInlineUpdate(task.id, 'team', team.key)}
+              >
+                <span 
+                  className="w-2 h-2 rounded-full mr-2" 
+                  style={{ backgroundColor: team.color }}
+                />
+                {team.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Title */}
@@ -203,37 +233,144 @@ function SortableTaskRow({
         )}
       </div>
 
-      {/* Status */}
-      <div className="w-32 flex-shrink-0">
-        <span 
-          className={cn("px-2 py-1 rounded", getTextSize('xs'), "font-semibold uppercase")}
-          style={{ backgroundColor: status.bgColor, color: status.color }}
-        >
-          {status.label}
-        </span>
+      {/* Epic - Inline Dropdown */}
+      <div className="w-28 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full text-left hover:opacity-80 transition-opacity">
+              {task.epic ? (
+                <Badge 
+                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer truncate max-w-full")}
+                  style={{ 
+                    backgroundColor: `${task.epic.color}20`, 
+                    color: task.epic.color,
+                    borderColor: task.epic.color 
+                  }}
+                  variant="outline"
+                >
+                  {task.epic.name}
+                </Badge>
+              ) : (
+                <span className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer")}>—</span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'epicId', null)}>
+              <span className="text-muted-foreground">No Epic</span>
+            </DropdownMenuItem>
+            {epics.map((epic) => (
+              <DropdownMenuItem 
+                key={epic.id} 
+                onClick={() => onInlineUpdate(task.id, 'epicId', epic.id)}
+              >
+                <span 
+                  className="w-2 h-2 rounded-full mr-2 flex-shrink-0" 
+                  style={{ backgroundColor: epic.color }}
+                />
+                <span className="truncate">{epic.name}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Priority */}
-      <div className="w-10 flex-shrink-0 text-center ml-2">
-        <span className={cn(getTextSize('base'), "font-bold", priority.color)}>
-          {priority.icon}
-        </span>
+      {/* Status - Inline Dropdown */}
+      <div className="w-32 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="hover:opacity-80 transition-opacity">
+              <span 
+                className={cn("px-2 py-1 rounded cursor-pointer", getTextSize('xs'), "font-semibold uppercase")}
+                style={{ backgroundColor: status.bgColor, color: status.color }}
+              >
+                {status.label}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40">
+            {statuses.map((s) => {
+              const sConfig = getStatusConfig(s.key as TaskStatus)
+              return (
+                <DropdownMenuItem 
+                  key={s.key} 
+                  onClick={() => onInlineUpdate(task.id, 'status', s.key)}
+                >
+                  <span 
+                    className="w-2 h-2 rounded-full mr-2" 
+                    style={{ backgroundColor: sConfig.color }}
+                  />
+                  {s.name}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Assignee */}
-      <div className="flex-shrink-0" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
-        {task.assignee ? (
-          <Avatar style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
-            {task.assignee.avatarUrl ? (
-              <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
-            ) : null}
-            <AvatarFallback className={cn(getTextSize('sm'), "bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold")}>
-              {task.assignee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-            </AvatarFallback>
-          </Avatar>
-        ) : (
-          <div className="rounded-full border-2 border-dashed border-muted-foreground/30" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} />
-        )}
+      {/* Priority - Inline Dropdown */}
+      <div className="w-10 flex-shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="hover:opacity-80 transition-opacity">
+              <span className={cn(getTextSize('base'), "font-bold cursor-pointer", priority.color)}>
+                {priority.icon}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-32">
+            {Object.entries(priorityConfig).map(([key, config]) => (
+              <DropdownMenuItem 
+                key={key} 
+                onClick={() => onInlineUpdate(task.id, 'priority', key)}
+              >
+                <span className={cn("font-bold mr-2", config.color)}>{config.icon}</span>
+                {config.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Assignee - Inline Dropdown */}
+      <div className="flex-shrink-0" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="hover:opacity-80 transition-opacity">
+              {task.assignee ? (
+                <Avatar style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} className="cursor-pointer">
+                  {task.assignee.avatarUrl ? (
+                    <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
+                  ) : null}
+                  <AvatarFallback className={cn(getTextSize('sm'), "bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold")}>
+                    {task.assignee.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <div className="rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground cursor-pointer" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} />
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'assigneeId', null)}>
+              <span className="text-muted-foreground">Unassigned</span>
+            </DropdownMenuItem>
+            {users.map((user) => (
+              <DropdownMenuItem 
+                key={user.id} 
+                onClick={() => onInlineUpdate(task.id, 'assigneeId', user.id)}
+              >
+                <Avatar className="w-5 h-5 mr-2">
+                  {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+                  <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                    {user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate">{user.name}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )
@@ -243,6 +380,7 @@ export function SprintView({
   sprint,
   users,
   allSprints,
+  epics = [],
   currentUser,
   projectId,
   onBack,
@@ -364,6 +502,76 @@ export function SprintView({
     }
     onTaskCreate?.(newTask)
   }, [localSprint.id, onTaskCreate])
+
+  // Handle inline updates with auto-save
+  const handleInlineUpdate = useCallback(async (taskId: string, field: string, value: string | null) => {
+    // Optimistic update
+    const originalTask = localSprint.tasks.find(t => t.id === taskId)
+    if (!originalTask) return
+
+    // Build update payload
+    const updatePayload: Record<string, any> = { [field]: value }
+    
+    // If updating epicId, also update the epic relation for optimistic UI
+    let optimisticEpic = undefined
+    if (field === 'epicId') {
+      optimisticEpic = value ? epics.find(e => e.id === value) : null
+    }
+    
+    // If updating assigneeId, also update the assignee relation for optimistic UI
+    let optimisticAssignee = undefined
+    if (field === 'assigneeId') {
+      optimisticAssignee = value ? users.find(u => u.id === value) : null
+    }
+
+    // Optimistic local update
+    setLocalSprint(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t => {
+        if (t.id !== taskId) return t
+        const updated = { ...t, [field]: value }
+        if (field === 'epicId' && optimisticEpic !== undefined) {
+          updated.epic = optimisticEpic ? { id: optimisticEpic.id, name: optimisticEpic.name, color: optimisticEpic.color } : null
+        }
+        if (field === 'assigneeId' && optimisticAssignee !== undefined) {
+          updated.assignee = optimisticAssignee || null
+        }
+        return updated
+      }),
+    }))
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      })
+
+      if (response.ok) {
+        const updatedTask = await response.json()
+        // Update with actual server response
+        setLocalSprint(prev => ({
+          ...prev,
+          tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
+        }))
+        onTaskUpdate?.(updatedTask)
+      } else {
+        // Revert on error
+        setLocalSprint(prev => ({
+          ...prev,
+          tasks: prev.tasks.map(t => t.id === taskId ? originalTask : t),
+        }))
+        console.error('Failed to update task')
+      }
+    } catch (error) {
+      // Revert on error
+      setLocalSprint(prev => ({
+        ...prev,
+        tasks: prev.tasks.map(t => t.id === taskId ? originalTask : t),
+      }))
+      console.error('Error updating task:', error)
+    }
+  }, [localSprint.tasks, epics, users, onTaskUpdate])
 
   const handleDragStart = useCallback((event: any) => {
     const task = localSprint.tasks.find(t => t.id === event.active.id)
@@ -721,6 +929,9 @@ export function SprintView({
                         isActive={selectedTask?.id === task.id}
                         onSelect={handleTaskSelect}
                         index={index}
+                        users={users}
+                        epics={epics}
+                        onInlineUpdate={handleInlineUpdate}
                       />
                     ))}
                   </SortableContext>

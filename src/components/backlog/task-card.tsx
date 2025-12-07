@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Task, TaskStatus, Priority } from '@/types'
+import { Task, TaskStatus, Priority, Epic } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -27,13 +27,14 @@ const priorityConfig: Record<Priority, { label: string; icon: string; color: str
 interface TaskCardProps {
   task: Task
   users?: { id: string; name: string; avatarUrl?: string | null }[]
+  epics?: Epic[]
   onClick: () => void
   onUpdate?: (task: Task) => void
   isActive?: boolean
 }
 
-export function TaskCard({ task, users = [], onClick, onUpdate, isActive = false }: TaskCardProps) {
-  const { statuses, getStatusConfig, getTeamConfig } = useProjectSettings()
+export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isActive = false }: TaskCardProps) {
+  const { statuses, teams, getStatusConfig, getTeamConfig } = useProjectSettings()
   const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
     attributes,
@@ -112,6 +113,38 @@ export function TaskCard({ task, users = [], onClick, onUpdate, isActive = false
     }
   }
 
+  async function handleEpicChange(epicId: string | null) {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ epicId }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        onUpdate?.(updated)
+      }
+    } catch (error) {
+      console.error('Failed to update epic:', error)
+    }
+  }
+
+  async function handleTeamChange(team: string | null) {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ team }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        onUpdate?.(updated)
+      }
+    } catch (error) {
+      console.error('Failed to update team:', error)
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -135,19 +168,59 @@ export function TaskCard({ task, users = [], onClick, onUpdate, isActive = false
         </svg>
       </div>
 
-      {/* Type/Team badge - fixed width for alignment */}
-      <div className="w-20 flex-shrink-0">
-        {teamConfig ? (
-          <Badge 
-            variant="outline" 
-            className={cn(getTextSize('xs'), "font-semibold px-2 py-0.5 border-0")}
-            style={{ backgroundColor: teamConfig.bgColor, color: teamConfig.color, height: `${6 * getScale() * 0.25}rem` }}
-          >
-            {teamConfig.shortLabel}
-          </Badge>
-        ) : (
-          <span className={cn(getTextSize('xs'), "text-muted-foreground")}>—</span>
-        )}
+      {/* Team dropdown - fixed width for alignment */}
+      <div className="w-20 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full text-left hover:opacity-80 transition-opacity">
+              {teamConfig ? (
+                <Badge 
+                  variant="outline" 
+                  className={cn(getTextSize('xs'), "font-semibold px-2 py-0.5 border-0 cursor-pointer")}
+                  style={{ backgroundColor: teamConfig.bgColor, color: teamConfig.color, height: `${6 * getScale() * 0.25}rem` }}
+                >
+                  {teamConfig.shortLabel}
+                </Badge>
+              ) : (
+                <span className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer")}>—</span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuLabel className={getTextSize('xs')}>Set Team</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                handleTeamChange(null)
+              }}
+              className={cn(!task.team && "bg-accent")}
+            >
+              <span className="text-muted-foreground">No Team</span>
+            </DropdownMenuItem>
+            {teams.map((team) => (
+              <DropdownMenuItem 
+                key={team.key} 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleTeamChange(team.key)
+                }}
+                className={cn(task.team === team.key && "bg-accent")}
+              >
+                <span 
+                  className="w-2 h-2 rounded-full mr-2" 
+                  style={{ backgroundColor: team.color }}
+                />
+                {team.name}
+                {task.team === team.key && (
+                  <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Title with tags - clickable area */}
@@ -207,6 +280,65 @@ export function TaskCard({ task, users = [], onClick, onUpdate, isActive = false
             {task._count.comments}
           </span>
         )}
+      </div>
+
+      {/* Epic dropdown - between title and status */}
+      <div className="w-28 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full text-left hover:opacity-80 transition-opacity">
+              {task.epic ? (
+                <Badge 
+                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer truncate max-w-full")}
+                  style={{ 
+                    backgroundColor: `${task.epic.color}20`, 
+                    color: task.epic.color,
+                    borderColor: task.epic.color 
+                  }}
+                  variant="outline"
+                >
+                  {task.epic.name}
+                </Badge>
+              ) : (
+                <span className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer")}>—</span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuLabel className={getTextSize('xs')}>Set Epic</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                handleEpicChange(null)
+              }}
+              className={cn(!task.epicId && "bg-accent")}
+            >
+              <span className="text-muted-foreground">No Epic</span>
+            </DropdownMenuItem>
+            {epics.map((epic) => (
+              <DropdownMenuItem 
+                key={epic.id} 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleEpicChange(epic.id)
+                }}
+                className={cn(task.epicId === epic.id && "bg-accent")}
+              >
+                <span 
+                  className="w-2 h-2 rounded-full mr-2 flex-shrink-0" 
+                  style={{ backgroundColor: epic.color }}
+                />
+                <span className="truncate">{epic.name}</span>
+                {task.epicId === epic.id && (
+                  <svg className="w-4 h-4 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Status dropdown - fixed width for alignment */}

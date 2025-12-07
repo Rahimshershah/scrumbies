@@ -739,6 +739,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
               sprint={currentViewingSprint}
               users={users}
               allSprints={sprints}
+              epics={epics}
               currentUser={currentUser}
               projectId={projectId}
               onBack={() => setViewingSprint(null)}
@@ -942,6 +943,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     key={sprint.id}
                     sprint={sprint}
                     users={users}
+                    epics={epics}
                     availableSprints={filteredPlannedSprints}
                     projectId={projectId}
                     onTaskClick={handleTaskClick}
@@ -978,6 +980,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     key={sprint.id}
                     sprint={sprint}
                     users={users}
+                    epics={epics}
                     availableSprints={filteredPlannedSprints.filter(s => s.id !== sprint.id)}
                     projectId={projectId}
                     onTaskClick={handleTaskClick}
@@ -1007,6 +1010,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                 <BacklogSection
                   tasks={filteredBacklogTasks}
                   users={users}
+                  epics={epics}
                   projectId={projectId}
                   onTaskClick={handleTaskClick}
                   onCreateTask={handleCreateTask}

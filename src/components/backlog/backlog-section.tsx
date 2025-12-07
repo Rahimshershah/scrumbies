@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Task } from '@/types'
+import { Task, Epic } from '@/types'
 import { TaskCard } from './task-card'
 import { InlineTaskInput } from './inline-task-input'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 interface BacklogSectionProps {
   tasks: Task[]
   users: { id: string; name: string; avatarUrl?: string | null }[]
+  epics?: Epic[]
   projectId?: string
   onTaskClick: (task: Task) => void
   onCreateTask: (task: Task) => void
@@ -22,6 +23,7 @@ interface BacklogSectionProps {
 export function BacklogSection({
   tasks,
   users,
+  epics = [],
   projectId,
   onTaskClick,
   onCreateTask,
@@ -56,6 +58,7 @@ export function BacklogSection({
             key={task.id}
             task={task}
             users={users}
+            epics={epics}
             onClick={() => onTaskClick(task)}
             onUpdate={onTaskUpdate}
             isActive={selectedTaskId === task.id}
