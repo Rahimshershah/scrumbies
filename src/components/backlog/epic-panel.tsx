@@ -170,38 +170,41 @@ export function EpicPanel({
             {epics.map((epic) => (
               <div
                 key={epic.id}
-                className={`group rounded-md transition-colors overflow-hidden ${
+                className={`rounded-md transition-colors ${
                   selectedEpicId === epic.id
                     ? 'bg-primary text-primary-foreground'
                     : 'hover:bg-muted'
                 }`}
               >
-                <div className="flex items-center">
+                <div className="flex items-start gap-1 p-2">
+                  {/* Main clickable area for filtering */}
                   <button
                     onClick={() => onSelectEpic(epic.id)}
-                    className="flex-1 min-w-0 text-left px-3 py-2"
+                    className="flex-1 min-w-0 text-left"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2">
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{ backgroundColor: epic.color }}
                       />
-                      <span className="font-medium truncate text-sm">{epic.name}</span>
+                      <span className="font-medium text-sm line-clamp-2 break-words">{epic.name}</span>
                     </div>
                     {epic._count && (
-                      <div className={`text-xs mt-1 ${selectedEpicId === epic.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                      <div className={`text-xs mt-1 ml-5 ${selectedEpicId === epic.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                         {epic._count.tasks} task{epic._count.tasks !== 1 ? 's' : ''}
                       </div>
                     )}
                   </button>
 
+                  {/* Edit button - always visible */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
-                        className={`flex-shrink-0 p-1.5 mr-1 rounded opacity-60 hover:opacity-100 transition-opacity ${
-                          selectedEpicId === epic.id ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted-foreground/20'
+                        className={`flex-shrink-0 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${
+                          selectedEpicId === epic.id ? 'text-primary-foreground' : 'text-muted-foreground'
                         }`}
                         onClick={(e) => e.stopPropagation()}
+                        title="Edit epic"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
