@@ -79,6 +79,15 @@ export async function PATCH(
       include: {
         tasks: {
           orderBy: { order: 'asc' },
+          include: {
+            assignee: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+          },
         },
       },
     })

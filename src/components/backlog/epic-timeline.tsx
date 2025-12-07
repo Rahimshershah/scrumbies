@@ -210,70 +210,68 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between bg-background">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="px-3 py-2 border-b flex items-center justify-between bg-background">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onBack}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Epic Timeline</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-base font-semibold">Epic Timeline</h1>
+            <p className="text-xs text-muted-foreground">
               {epicsWithTasks.length} epic{epicsWithTasks.length !== 1 ? 's' : ''} • 
               {formatDate(startDate)} - {formatDate(endDate)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center border rounded-md p-0.5 bg-muted/30">
-            <Button
-              variant={view === 'timeline' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 px-3"
-              onClick={() => setView('timeline')}
-            >
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Timeline
-            </Button>
-            <Button
-              variant={view === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-7 px-3"
-              onClick={() => setView('list')}
-            >
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-              List
-            </Button>
-          </div>
+        <div className="flex items-center border rounded p-0.5 bg-muted/30">
+          <Button
+            variant={view === 'timeline' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setView('timeline')}
+          >
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Timeline
+          </Button>
+          <Button
+            variant={view === 'list' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setView('list')}
+          >
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+            List
+          </Button>
         </div>
       </div>
 
       {view === 'timeline' ? (
         <ScrollArea className="flex-1">
-          <div className="min-w-[1200px]">
+          <div className="min-w-[900px]">
             {/* Week headers */}
             <div className="sticky top-0 bg-background z-10 border-b">
               <div className="flex">
-                <div className="w-64 flex-shrink-0 p-3 border-r font-medium text-sm text-muted-foreground">
+                <div className="w-52 flex-shrink-0 px-2 py-1.5 border-r font-medium text-xs text-muted-foreground">
                   Epic
                 </div>
                 <div className="flex-1 flex">
                   {weeks.map((week, i) => (
                     <div
                       key={i}
-                      className={`flex-1 min-w-[100px] p-2 text-center text-xs border-r ${
+                      className={`flex-1 min-w-[80px] px-1 py-1.5 text-center text-[10px] border-r ${
                         isCurrentWeek(week) ? 'bg-primary/5' : ''
                       }`}
                     >
                       <div className="font-medium">{formatDate(week)}</div>
                       {isCurrentWeek(week) && (
-                        <div className="text-primary text-[10px] font-semibold">This Week</div>
+                        <div className="text-primary text-[9px] font-semibold">Now</div>
                       )}
                     </div>
                   ))}
@@ -292,41 +290,41 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                   {/* Epic Row */}
                   <div className="flex bg-muted/20">
                     {/* Epic info */}
-                    <div className="w-64 flex-shrink-0 p-3 border-r bg-muted/30">
+                    <div className="w-52 flex-shrink-0 px-2 py-1.5 border-r bg-muted/30">
                       <button
                         onClick={() => onEpicClick(epic.id)}
                         className="text-left w-full"
                       >
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-1.5">
                           <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: epic.color }}
                           />
-                          <span className="font-semibold truncate">{epic.name}</span>
+                          <span className="font-medium text-sm truncate">{epic.name}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 ml-4">
                           <span>{stats.total} tasks</span>
                           <span>•</span>
-                          <span>{stats.progress}% done</span>
-                        </div>
-                        {/* Progress bar */}
-                        <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-green-500 rounded-full transition-all"
-                            style={{ width: `${stats.progress}%` }}
-                          />
+                          <span>{stats.progress}%</span>
+                          {/* Inline progress bar */}
+                          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-green-500 rounded-full"
+                              style={{ width: `${stats.progress}%` }}
+                            />
+                          </div>
                         </div>
                       </button>
                     </div>
 
                     {/* Epic Timeline bar */}
-                    <div className="flex-1 relative h-16">
+                    <div className="flex-1 relative h-10">
                       {/* Week grid lines */}
                       <div className="absolute inset-0 flex">
                         {weeks.map((week, i) => (
                           <div
                             key={i}
-                            className={`flex-1 min-w-[100px] border-r ${
+                            className={`flex-1 min-w-[80px] border-r ${
                               isCurrentWeek(week) ? 'bg-primary/5' : ''
                             }`}
                           />
@@ -339,11 +337,11 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div
-                                className="absolute top-3 h-10 rounded-md cursor-pointer hover:opacity-90 transition-opacity flex items-center px-3 text-white text-sm font-medium shadow-sm"
+                                className="absolute top-1.5 h-7 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center px-2 text-white text-xs font-medium shadow-sm"
                                 style={{
                                   ...barStyle,
                                   backgroundColor: epic.color,
-                                  minWidth: '120px',
+                                  minWidth: '80px',
                                 }}
                                 onClick={() => onEpicClick(epic.id)}
                               >
@@ -373,14 +371,14 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                   {(epic.tasks || []).length > 0 && (
                     <div className="flex">
                       {/* Task list sidebar */}
-                      <div className="w-64 flex-shrink-0 border-r bg-background">
+                      <div className="w-52 flex-shrink-0 border-r bg-background">
                         {(epic.tasks || []).map((task: any) => (
                           <button
                             key={task.id}
                             onClick={() => onTaskClick(task)}
-                            className="w-full text-left px-3 py-2 border-b hover:bg-muted/50 flex items-center gap-2"
+                            className="w-full text-left px-2 py-1 border-b hover:bg-muted/50 flex items-center gap-1.5"
                           >
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                               task.status === 'DONE' || task.status === 'LIVE'
                                 ? 'bg-green-500'
                                 : task.status === 'IN_PROGRESS'
@@ -389,8 +387,8 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                                 ? 'bg-red-500'
                                 : 'bg-gray-400'
                             }`} />
-                            <span className="text-xs font-mono text-primary/70 flex-shrink-0">{task.taskKey}</span>
-                            <span className="text-sm truncate flex-1">{task.title}</span>
+                            <span className="text-[10px] font-mono text-primary/70 flex-shrink-0">{task.taskKey}</span>
+                            <span className="text-xs truncate flex-1">{task.title}</span>
                           </button>
                         ))}
                       </div>
@@ -401,13 +399,13 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                           const taskBarStyle = getTaskBarStyle(task)
                           
                           return (
-                            <div key={task.id} className="relative h-10 border-b">
+                            <div key={task.id} className="relative h-7 border-b">
                               {/* Week grid lines */}
                               <div className="absolute inset-0 flex">
                                 {weeks.map((week, i) => (
                                   <div
                                     key={i}
-                                    className={`flex-1 min-w-[100px] border-r ${
+                                    className={`flex-1 min-w-[80px] border-r ${
                                       isCurrentWeek(week) ? 'bg-primary/5' : ''
                                     }`}
                                   />
@@ -420,7 +418,7 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <div
-                                        className={`absolute top-1.5 h-7 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center px-2 text-white text-xs font-medium shadow-sm ${
+                                        className={`absolute top-1 h-5 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center px-1.5 text-white text-[10px] font-medium shadow-sm ${
                                           task.status === 'DONE' || task.status === 'LIVE'
                                             ? 'bg-green-500'
                                             : task.status === 'IN_PROGRESS'
@@ -431,11 +429,11 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                                         }`}
                                         style={{
                                           ...taskBarStyle,
-                                          minWidth: '80px',
+                                          minWidth: '60px',
                                         }}
                                         onClick={() => onTaskClick(task)}
                                       >
-                                        <span className="truncate">{task.taskKey} - {task.title}</span>
+                                        <span className="truncate">{task.taskKey}</span>
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
@@ -464,7 +462,7 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <div
-                                        className={`absolute left-2 top-1.5 h-7 px-2 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center text-white text-xs font-medium shadow-sm ${
+                                        className={`absolute left-1 top-1 h-5 px-1.5 rounded cursor-pointer hover:opacity-90 transition-opacity flex items-center text-white text-[10px] font-medium shadow-sm ${
                                           task.status === 'DONE' || task.status === 'LIVE'
                                             ? 'bg-green-500'
                                             : task.status === 'IN_PROGRESS'
@@ -475,7 +473,7 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                                         }`}
                                         onClick={() => onTaskClick(task)}
                                       >
-                                        <span className="truncate">{task.taskKey} - No sprint dates</span>
+                                        <span className="truncate">{task.taskKey}</span>
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
