@@ -86,10 +86,11 @@ export async function POST(
     await writeFile(filePath, buffer)
 
     // Create attachment record in database
+    // Use API route for serving attachments in standalone mode
     const attachment = await prisma.attachment.create({
       data: {
         filename: file.name,
-        url: `/uploads/attachments/${uniqueFilename}`,
+        url: `/api/uploads/attachments/${uniqueFilename}`,
         size: file.size,
         mimeType: file.type || 'application/octet-stream',
         taskId,

@@ -28,9 +28,26 @@ export async function DELETE(
     }
 
     // Delete file from disk
+    // Handle both old (/uploads/...) and new (/api/uploads/...) URL formats
     try {
-      const filePath = join(process.cwd(), 'public', attachment.url)
-      await unlink(filePath)
+      const filename = attachment.url.split('/').pop()
+      if (filename) {
+        const possiblePaths = [
+          join(process.cwd(), 'public', 'uploads', 'attachments', filename),
+          join(process.cwd(), 'uploads', 'attachments', filename),
+          join('/var/www/scrumbies', 'uploads', 'attachments', filename),
+          join('/var/www/scrumbies', 'public', 'uploads', 'attachments', filename),
+        ]
+        
+        for (const filePath of possiblePaths) {
+          try {
+            await unlink(filePath)
+            break // File deleted successfully
+          } catch {
+            // Try next path
+          }
+        }
+      }
     } catch (e) {
       // File might not exist, continue with database deletion
       console.warn('Could not delete file:', e)
@@ -50,6 +67,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
 
 
 
