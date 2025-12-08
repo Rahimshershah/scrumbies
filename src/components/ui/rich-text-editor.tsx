@@ -10,6 +10,7 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
+import Gapcursor from '@tiptap/extension-gapcursor'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import Mention from '@tiptap/extension-mention'
@@ -119,8 +120,13 @@ function MenuBar({ editor }: { editor: Editor | null }) {
 
   const isInTable = editor.isActive('table')
 
+  // Prevent blur when clicking toolbar buttons
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-0.5 p-1 border-b bg-muted/30">
+    <div className="flex flex-wrap items-center gap-0.5 p-1 border-b bg-muted/30" onMouseDown={handleMouseDown}>
       <Button
         type="button"
         variant="ghost"
@@ -402,6 +408,7 @@ export function RichTextEditor({
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
+      Gapcursor,
       Table.configure({
         resizable: true,
         HTMLAttributes: {
