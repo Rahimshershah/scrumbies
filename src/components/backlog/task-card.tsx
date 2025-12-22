@@ -152,7 +152,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       {...attributes}
       {...listeners}
       className={cn(
-        "flex items-center gap-4 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
+        "flex items-center gap-2 sm:gap-3 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing overflow-hidden",
         getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing",
         isActive && "bg-blue-50 dark:bg-blue-950/20"
@@ -223,9 +223,10 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         </DropdownMenu>
       </div>
 
-      {/* Title with tags - clickable area - shrinks to fit */}
+      {/* Title with tags - shrinks aggressively to make room for right columns */}
       <div
-        className="flex-1 flex items-center gap-2 min-w-0 hover:text-primary transition-colors cursor-pointer overflow-hidden"
+        className="flex-shrink min-w-0 flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer overflow-hidden"
+        style={{ flex: '1 1 0%' }}
         onClick={(e) => {
           e.stopPropagation()
           onClick()
@@ -238,7 +239,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
           </span>
         )}
         {tags.map((tag) => (
-          <Badge key={tag} variant="outline" className={cn(getTextSize('xs'), "font-normal px-1.5 py-0 flex-shrink-0")} style={{ height: `${5 * getScale() * 0.25}rem` }}>
+          <Badge key={tag} variant="outline" className={cn(getTextSize('xs'), "font-normal px-1.5 py-0 flex-shrink-0 hidden sm:inline-flex")} style={{ height: `${5 * getScale() * 0.25}rem` }}>
             {tag}
           </Badge>
         ))}
@@ -246,11 +247,11 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
           getTextSize('base'), "truncate",
           (task.status === 'DONE' || task.status === 'LIVE') && "line-through text-muted-foreground"
         )}>{displayTitle}</span>
-        
-        {/* Split indicators */}
+
+        {/* Split indicators - hidden on very small screens */}
         {task.splitFrom && (
-          <span 
-            className={cn(getTextSize('xs'), "text-amber-700 dark:text-amber-300 flex items-center gap-0.5 flex-shrink-0 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded")}
+          <span
+            className={cn(getTextSize('xs'), "text-amber-700 dark:text-amber-300 hidden sm:flex items-center gap-0.5 flex-shrink-0 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded")}
             title={`Continuation of: ${task.splitFrom.title}`}
           >
             <svg className={getIconSize(3.5)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,8 +261,8 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
           </span>
         )}
         {task.splitTasks && task.splitTasks.length > 0 && (
-          <span 
-            className={cn(getTextSize('xs'), "text-purple-700 dark:text-purple-300 flex items-center gap-0.5 flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.5 rounded")}
+          <span
+            className={cn(getTextSize('xs'), "text-purple-700 dark:text-purple-300 hidden sm:flex items-center gap-0.5 flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 px-1.5 py-0.5 rounded")}
             title={`Split into ${task.splitTasks.length} task(s)`}
           >
             <svg className={getIconSize(3.5)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,9 +272,9 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
           </span>
         )}
 
-        {/* Comment count */}
+        {/* Comment count - hidden on small screens */}
         {task._count && task._count.comments > 0 && (
-          <span className={cn(getTextSize('xs'), "text-muted-foreground flex items-center gap-1 flex-shrink-0")}>
+          <span className={cn(getTextSize('xs'), "text-muted-foreground hidden md:flex items-center gap-1 flex-shrink-0")}>
             <svg className={getIconSize(3.5)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
@@ -282,7 +283,68 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         )}
       </div>
 
-      {/* Status dropdown - always visible, priority over Epic */}
+      {/* Epic dropdown - always visible, fixed width */}
+      <div className="w-[100px] sm:w-[120px] md:w-[140px] flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full text-left hover:opacity-80 transition-opacity">
+              {task.epic ? (
+                <Badge
+                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer truncate max-w-full block")}
+                  style={{
+                    backgroundColor: `${task.epic.color}20`,
+                    color: task.epic.color,
+                    borderColor: task.epic.color
+                  }}
+                  variant="outline"
+                >
+                  {task.epic.name}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer px-2 py-0.5 border-dashed")}>
+                  No Epic
+                </Badge>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuLabel className={getTextSize('xs')}>Set Epic</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                handleEpicChange(null)
+              }}
+              className={cn(!task.epicId && "bg-accent")}
+            >
+              <span className="text-muted-foreground">No Epic</span>
+            </DropdownMenuItem>
+            {epics.map((epic) => (
+              <DropdownMenuItem
+                key={epic.id}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleEpicChange(epic.id)
+                }}
+                className={cn(task.epicId === epic.id && "bg-accent")}
+              >
+                <span
+                  className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
+                  style={{ backgroundColor: epic.color }}
+                />
+                <span className="truncate">{epic.name}</span>
+                {task.epicId === epic.id && (
+                  <svg className="w-4 h-4 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Status dropdown - always visible, fixed width */}
       <div className="w-24 sm:w-28 md:w-32 flex-shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -438,67 +500,6 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
                 <span>{user.name}</span>
                 {task.assigneeId === user.id && (
                   <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Epic dropdown - at the end, hidden on smaller screens, lowest priority */}
-      <div className="hidden xl:block w-[140px] 2xl:w-[180px] flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="text-left hover:opacity-80 transition-opacity">
-              {task.epic ? (
-                <Badge
-                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis max-w-full")}
-                  style={{
-                    backgroundColor: `${task.epic.color}20`,
-                    color: task.epic.color,
-                    borderColor: task.epic.color
-                  }}
-                  variant="outline"
-                >
-                  {task.epic.name}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className={cn(getTextSize('xs'), "text-muted-foreground hover:text-foreground cursor-pointer px-2.5 py-1 border-dashed whitespace-nowrap")}>
-                  No Epic
-                </Badge>
-              )}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel className={getTextSize('xs')}>Set Epic</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation()
-                handleEpicChange(null)
-              }}
-              className={cn(!task.epicId && "bg-accent")}
-            >
-              <span className="text-muted-foreground">No Epic</span>
-            </DropdownMenuItem>
-            {epics.map((epic) => (
-              <DropdownMenuItem
-                key={epic.id}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleEpicChange(epic.id)
-                }}
-                className={cn(task.epicId === epic.id && "bg-accent")}
-              >
-                <span
-                  className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
-                  style={{ backgroundColor: epic.color }}
-                />
-                <span className="truncate">{epic.name}</span>
-                {task.epicId === epic.id && (
-                  <svg className="w-4 h-4 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 )}
