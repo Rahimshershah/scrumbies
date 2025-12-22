@@ -118,7 +118,7 @@ export function SprintSection({
     <div className="mb-3">
       {/* Sprint header */}
       <div className={cn(
-        "flex items-center gap-3 px-3 py-1.5 rounded-t-md border cursor-pointer bg-muted/50"
+        "flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-t-md border cursor-pointer bg-muted/50 min-w-0"
       )}
       onClick={() => setIsCollapsed(!isCollapsed)}
       >
@@ -134,8 +134,8 @@ export function SprintSection({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
 
-        {/* Sprint name */}
-        <h3 className="font-medium text-sm">{sprint.name}</h3>
+        {/* Sprint name - truncates on small screens */}
+        <h3 className="font-medium text-sm truncate min-w-0 max-w-[120px] sm:max-w-[200px] md:max-w-none">{sprint.name}</h3>
 
         {/* Active badge */}
         {variant === 'active' && (
@@ -144,9 +144,9 @@ export function SprintSection({
           </Badge>
         )}
 
-        {/* Date range */}
+        {/* Date range - hidden on small screens */}
         {(sprint.startDate || sprint.endDate) && (
-          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+          <span className="hidden sm:flex text-[11px] text-muted-foreground items-center gap-1 flex-shrink-0">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
@@ -154,17 +154,18 @@ export function SprintSection({
           </span>
         )}
 
-        {/* Task count badge */}
-        <Badge variant="outline" className="text-[10px] h-5 px-2 gap-1">
+        {/* Task count badge - always visible but compact on mobile */}
+        <Badge variant="outline" className="text-[10px] h-5 px-1.5 sm:px-2 gap-1 flex-shrink-0">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          {taskCount} {taskCount === 1 ? 'task' : 'tasks'}
+          <span className="hidden sm:inline">{taskCount} {taskCount === 1 ? 'task' : 'tasks'}</span>
+          <span className="sm:hidden">{taskCount}</span>
         </Badge>
 
-        {/* Split indicator - shows if there are split tasks in this sprint */}
+        {/* Split indicator - hidden on small screens */}
         {(splitTasksCount > 0 || splitFromCount > 0) && (
-          <Badge variant="secondary" className="text-[10px] h-5 px-2 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
+          <Badge variant="secondary" className="hidden md:flex text-[10px] h-5 px-2 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400 flex-shrink-0">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
@@ -174,7 +175,7 @@ export function SprintSection({
           </Badge>
         )}
 
-        <div className="ml-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="ml-auto flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {/* Eye icon for dedicated view */}
           <Button 
             variant="ghost" 

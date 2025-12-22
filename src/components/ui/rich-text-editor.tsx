@@ -541,7 +541,7 @@ export function RichTextDisplay({ content, className }: { content: string; class
       Underline,
       Table.configure({
         HTMLAttributes: {
-          class: 'border-collapse border border-border w-full',
+          class: 'border-collapse border border-border w-full min-w-[300px]',
         },
       }),
       TableRow,
@@ -570,14 +570,15 @@ export function RichTextDisplay({ content, className }: { content: string; class
     editorProps: {
       attributes: {
         class: cn(
-          'prose prose-sm dark:prose-invert max-w-none',
+          'prose prose-sm dark:prose-invert max-w-none overflow-x-auto',
           'prose-headings:mt-2 prose-headings:mb-1',
-          'prose-p:my-1 prose-ul:my-1 prose-ol:my-1',
+          'prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-p:break-words',
           'prose-li:my-0.5',
           '[&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4',
           '[&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic',
-          '[&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm',
+          '[&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:break-all',
           '[&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto',
+          '[&_table]:block [&_table]:overflow-x-auto [&_table]:max-w-full',
           className
         ),
       },

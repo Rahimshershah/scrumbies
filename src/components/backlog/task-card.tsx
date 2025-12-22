@@ -168,8 +168,8 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         </svg>
       </div>
 
-      {/* Team dropdown - fixed width for alignment */}
-      <div className="w-20 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* Team dropdown - hidden on small screens */}
+      <div className="hidden md:block w-20 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full text-left hover:opacity-80 transition-opacity">
@@ -223,9 +223,9 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         </DropdownMenu>
       </div>
 
-      {/* Title with tags - clickable area */}
-      <div 
-        className="flex-1 flex items-center gap-2 min-w-0 hover:text-primary transition-colors cursor-pointer"
+      {/* Title with tags - clickable area - shrinks to fit */}
+      <div
+        className="flex-1 flex items-center gap-2 min-w-0 hover:text-primary transition-colors cursor-pointer overflow-hidden"
         onClick={(e) => {
           e.stopPropagation()
           onClick()
@@ -282,8 +282,8 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         )}
       </div>
 
-      {/* Epic dropdown - positioned more centrally with spacing */}
-      <div className="min-w-[180px] flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
+      {/* Epic dropdown - hidden on small screens, visible on larger */}
+      <div className="hidden lg:block w-[140px] xl:w-[180px] flex-shrink-0 mx-2" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="text-left hover:opacity-80 transition-opacity">
@@ -343,8 +343,8 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         </DropdownMenu>
       </div>
 
-      {/* Status dropdown - fixed width for alignment */}
-      <div className="w-32 flex-shrink-0">
+      {/* Status dropdown - slightly smaller on mobile, stays visible */}
+      <div className="w-24 sm:w-28 md:w-32 flex-shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button

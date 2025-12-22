@@ -542,7 +542,7 @@ export function TaskDetailSidebar({
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-hidden">
               {/* Title */}
               <div>
                 {readOnly ? (
@@ -822,23 +822,25 @@ export function TaskDetailSidebar({
               {/* Description */}
               <div className="border-t pt-4">
                 <label className="text-sm font-semibold mb-2 block">Description</label>
-                {readOnly ? (
-                  description ? (
-                    <RichTextDisplay content={description} className="text-sm" />
+                <div className="overflow-x-auto max-w-full">
+                  {readOnly ? (
+                    description ? (
+                      <RichTextDisplay content={description} className="text-sm" />
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No description</p>
+                    )
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">No description</p>
-                  )
-                ) : (
-                  <RichTextEditor
-                    content={description}
-                    onChange={setDescription}
-                    onMentionsChange={setDescriptionMentions}
-                    placeholder="Add a description... (type @ to mention someone)"
-                    minHeight="80px"
-                    minimal
-                    users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
-                  />
-                )}
+                    <RichTextEditor
+                      content={description}
+                      onChange={setDescription}
+                      onMentionsChange={setDescriptionMentions}
+                      placeholder="Add a description... (type @ to mention someone)"
+                      minHeight="80px"
+                      minimal
+                      users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Attachments */}
@@ -1020,7 +1022,7 @@ export function TaskDetailSidebar({
                                     </Button>
                                   )}
                                 </div>
-                                <div className="text-sm"><RichTextDisplay content={comment.content} /></div>
+                                <div className="text-sm overflow-x-auto"><RichTextDisplay content={comment.content} /></div>
                               </div>
                             </div>
                           )
