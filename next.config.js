@@ -14,6 +14,32 @@ const nextConfig = {
     },
   },
 
+  // Disable aggressive caching for HTML pages (prevents stale JS issues with Cloudflare)
+  async headers() {
+    return [
+      {
+        // Apply to all pages
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+      {
+        // Allow caching for static assets (they have hashed filenames)
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ]
+  },
+
   // Rewrite old attachment URLs to the new API route
   async rewrites() {
     return [
