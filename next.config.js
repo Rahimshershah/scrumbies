@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Note: Removed 'standalone' output - using npm start instead for reliability
 
   // Speed up builds by disabling source maps in production
   productionBrowserSourceMaps: false,
