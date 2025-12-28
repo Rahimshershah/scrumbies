@@ -39,42 +39,85 @@ Scrumbies is a sprint backlog management tool built with Next.js 14, Prisma, and
 
 ## Deployment
 
-### Current Setup (Git-based)
-- Push to GitHub, pull on server, build and restart
-- Server: `sher@64.62.163.94:8899`
-- Path: `/var/www/scrumbies`
-- Process manager: PM2
-- GitHub: https://github.com/Rahimshershah/scrumbies.git
+### Server Info
+- **Host:** `64.62.163.94`
+- **SSH Port:** `8899`
+- **User:** `sher`
+- **App Path:** `/var/www/scrumbies`
+- **URL:** https://scrumbies.hesab.com
+- **Process Manager:** PM2 (process name: `scrumbies`)
+- **GitHub:** https://github.com/Rahimshershah/scrumbies.git
 
-### Deploy Commands
+### Database Info
+- **Type:** PostgreSQL (local on server)
+- **Database:** `scrumbies`
+- **User:** `scrumbies`
+- **Connection:** Configured in `/var/www/scrumbies/.env` on server
+
+### How to Deploy Updates
+
 ```bash
-# 1. Commit and push your changes
-git add . && git commit -m "Your message" && git push
+# Step 1: Commit and push your changes
+git add .
+git commit -m "Your commit message"
+git push
 
-# 2. SSH to server and run deploy
-ssh -p 8899 sher@64.62.163.94
-cd /var/www/scrumbies && ./server-deploy.sh
-
-# Or one-liner from local machine:
+# Step 2: SSH to server and run deploy script
 ssh -p 8899 sher@64.62.163.94 "cd /var/www/scrumbies && ./server-deploy.sh"
 ```
 
-### First-Time Server Setup
+**What the deploy script does:**
+1. `git pull` - pulls latest code from GitHub
+2. `npm ci` - installs dependencies
+3. `npx prisma generate` - generates Prisma client
+4. `npx prisma migrate deploy` - runs any new migrations (safe, won't delete data)
+5. `npm run build` - builds the Next.js app
+6. `pm2 restart scrumbies` - restarts the app
+
+### Quick Commands Reference
+
 ```bash
-# On the server:
-cd /var/www
-git clone https://github.com/Rahimshershah/scrumbies.git
-cd scrumbies
-cp /path/to/.env .env  # Copy your env file
-chmod +x server-deploy.sh
-./server-deploy.sh
+# Check if app is running
+ssh -p 8899 sher@64.62.163.94 "pm2 status scrumbies"
+
+# View app logs
+ssh -p 8899 sher@64.62.163.94 "pm2 logs scrumbies --lines 50"
+
+# Restart without rebuilding
+ssh -p 8899 sher@64.62.163.94 "pm2 restart scrumbies"
+
+# Check database connection
+ssh -p 8899 sher@64.62.163.94 "cd /var/www/scrumbies && npx prisma db pull --print"
 ```
 
-### Important Notes
-- `deploy.sh` (local rsync version) is in `.gitignore` - contains credentials, never commit!
+### Security Notes
+- `deploy.sh` is in `.gitignore` - contains SSH password, NEVER commit
 - `server-deploy.sh` is safe to commit - no credentials
-- Database is NOT touched by git - only migrations run via `prisma migrate deploy`
-- Uploads directory (`/var/www/scrumbies/uploads/`) persists independently of git
+- Server `.env` file contains database password - not in git
+- Uploads persist in `/var/www/scrumbies/uploads/` (not managed by git)
+
+### If Something Goes Wrong
+
+**App won't start:**
+```bash
+ssh -p 8899 sher@64.62.163.94 "pm2 logs scrumbies --lines 100"
+```
+
+**Database migration fails:**
+```bash
+# Check migration status
+ssh -p 8899 sher@64.62.163.94 "cd /var/www/scrumbies && npx prisma migrate status"
+
+# If new migration conflicts, mark as applied (use carefully!)
+ssh -p 8899 sher@64.62.163.94 "cd /var/www/scrumbies && npx prisma migrate resolve --applied MIGRATION_NAME"
+```
+
+**Need to restore .env on server:**
+```
+DATABASE_URL="postgresql://scrumbies:PASSWORD@localhost:5432/scrumbies?schema=public"
+NEXTAUTH_URL="https://scrumbies.hesab.com"
+NEXTAUTH_SECRET="generate-new-secret-with-openssl-rand-base64-32"
+```
 
 ---
 
