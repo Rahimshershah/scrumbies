@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Note: Removed 'output: standalone' for git-based deployments
+  // Use 'npm start' instead of standalone server
 
   // Speed up builds by disabling source maps in production
   productionBrowserSourceMaps: false,
