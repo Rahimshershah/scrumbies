@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth-utils'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { getUploadsDir } from '@/lib/utils'
 
 // Route segment config for App Router
 export const dynamic = 'force-dynamic'
@@ -69,7 +70,9 @@ export async function POST(
     }
 
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'attachments')
+    // Use persistent storage location that works in both dev and standalone mode
+    const baseUploadsDir = getUploadsDir()
+    const uploadsDir = join(baseUploadsDir, 'attachments')
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true })
     }

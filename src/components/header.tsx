@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { ImageCropper } from '@/components/ui/image-cropper'
 import { Project } from '@/types'
 import type { AppView } from './app-shell'
 
@@ -65,6 +66,10 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
   const [savingProfile, setSavingProfile] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // Image cropper state
+  const [showCropper, setShowCropper] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
   // Sync projects from props
   useEffect(() => {
@@ -139,14 +144,41 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
     reader.readAsDataURL(file)
   }
 
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    // Validate file size (max 5MB for cropping)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image too large. Please select an image under 5MB.')
+      return
+    }
+
+    // Read file and show cropper
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setSelectedImage(reader.result as string)
+      setShowCropper(true)
+    }
+    reader.readAsDataURL(file)
+
+    // Clear input so the same file can be selected again
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = ''
+    }
+  }
+
+  async function handleCroppedImageUpload(croppedBlob: Blob) {
     setUploadingAvatar(true)
     try {
       const formData = new FormData()
-      formData.append('avatar', file)
+      formData.append('avatar', croppedBlob, 'avatar.jpg')
 
       const res = await fetch('/api/user/profile', {
         method: 'POST',
@@ -159,15 +191,14 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
         onUserUpdate?.({ name: updated.name, email: updated.email, avatarUrl: updated.avatarUrl })
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to upload avatar')
+        throw new Error(error.error || 'Failed to upload avatar')
       }
     } catch (error) {
       console.error('Failed to upload avatar:', error)
+      throw error
     } finally {
       setUploadingAvatar(false)
-      if (avatarInputRef.current) {
-        avatarInputRef.current.value = ''
-      }
+      setSelectedImage(null)
     }
   }
 
@@ -265,14 +296,13 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
                 <Button variant="ghost" className="gap-2 h-9">
                   {currentProject ? (
                     <>
-                      <Avatar className="w-6 h-6">
-                        {currentProject.logoUrl ? (
-                          <AvatarImage src={currentProject.logoUrl} alt={currentProject.name} />
-                        ) : null}
-                        <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                      {currentProject.logoUrl ? (
+                        <img src={currentProject.logoUrl} alt={currentProject.name} className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] text-white font-medium">
                           {currentProject.key.slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
+                        </div>
+                      )}
                       <span className="text-sm font-medium">{currentProject.name}</span>
                     </>
                   ) : (
@@ -293,14 +323,13 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
                     onClick={() => onProjectChange?.(project.id)}
                     className="gap-2"
                   >
-                    <Avatar className="w-6 h-6">
-                      {project.logoUrl ? (
-                        <AvatarImage src={project.logoUrl} alt={project.name} />
-                      ) : null}
-                      <AvatarFallback className="text-[10px] bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                    {project.logoUrl ? (
+                      <img src={project.logoUrl} alt={project.name} className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-[10px] text-white font-medium">
                         {project.key.slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
+                      </div>
+                    )}
                     <div className="flex-1">
                       <span className="font-medium">{project.name}</span>
                       <span className="text-xs text-muted-foreground ml-2">{project.key}</span>
@@ -604,9 +633,22 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={handleAvatarUpload}
+                  onChange={handleAvatarSelect}
                 />
                 <p className="text-xs text-muted-foreground">Click the camera icon to upload a new photo</p>
+
+                {/* Image Cropper Modal */}
+                {selectedImage && (
+                  <ImageCropper
+                    open={showCropper}
+                    onClose={() => {
+                      setShowCropper(false)
+                      setSelectedImage(null)
+                    }}
+                    imageSrc={selectedImage}
+                    onCropComplete={handleCroppedImageUpload}
+                  />
+                )}
               </div>
 
               {/* Name */}

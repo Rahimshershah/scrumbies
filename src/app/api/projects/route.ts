@@ -30,6 +30,13 @@ export async function GET() {
           { createdById: user.id },
         ],
       },
+      select: {
+        id: true,
+        name: true,
+        key: true,
+        logoUrl: true,
+        createdAt: true,
+      },
       orderBy: { createdAt: 'asc' },
     })
 

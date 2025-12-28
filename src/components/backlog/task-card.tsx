@@ -152,7 +152,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       {...attributes}
       {...listeners}
       className={cn(
-        "flex items-center gap-2 sm:gap-3 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing overflow-hidden",
+        "relative flex items-center gap-2 sm:gap-3 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
         getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing",
         isActive && "bg-blue-50 dark:bg-blue-950/20"
@@ -283,14 +283,25 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
         )}
       </div>
 
-      {/* Epic dropdown - always visible, fixed width */}
-      <div className="w-[100px] sm:w-[120px] md:w-[140px] flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* Right columns container - ABSOLUTE: always visible, pins to right edge, overlays title */}
+      <div className={cn(
+        "absolute right-0 top-0 bottom-0 flex items-center gap-2 z-10 pl-8 pr-3",
+        // Match row background states
+        "bg-card",
+        isActive && "!bg-blue-50 dark:!bg-blue-950/20",
+        // Left fade gradient to show content underneath
+        "before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-8 before:-translate-x-full before:bg-gradient-to-r before:from-transparent before:to-card",
+        isActive && "before:!bg-gradient-to-r before:!from-transparent before:!to-blue-50 dark:before:!to-blue-950/20"
+      )}>
+
+      {/* Epic dropdown - responsive width, full text on large screens */}
+      <div className="w-[80px] sm:w-[100px] md:w-[120px] lg:w-auto lg:min-w-[120px] lg:max-w-[200px] xl:max-w-[280px]" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full text-left hover:opacity-80 transition-opacity">
               {task.epic ? (
                 <Badge
-                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer truncate max-w-full block")}
+                  className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer max-w-full block truncate lg:overflow-visible lg:text-clip lg:whitespace-nowrap")}
                   style={{
                     backgroundColor: `${task.epic.color}20`,
                     color: task.epic.color,
@@ -345,7 +356,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       </div>
 
       {/* Status dropdown - always visible, fixed width */}
-      <div className="w-24 sm:w-28 md:w-32 flex-shrink-0">
+      <div className="w-20 sm:w-24 md:w-28">
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button
@@ -387,7 +398,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       </div>
 
       {/* Priority dropdown */}
-      <div className="w-10 flex-shrink-0 ml-2">
+      <div className="w-8 sm:w-10">
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button
@@ -434,11 +445,11 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       </div>
 
       {/* Assignee dropdown */}
-      <div className={cn("flex-shrink-0")} style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
+      <div style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             {task.assignee ? (
-              <Avatar className={cn("cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all")} style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
+              <Avatar className={cn("cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all")} style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }}>
                 {task.assignee.avatarUrl ? (
                   <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
                 ) : null}
@@ -447,7 +458,7 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
                 </AvatarFallback>
               </Avatar>
             ) : (
-              <button className="rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 flex items-center justify-center transition-colors" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }}>
+              <button className="rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 flex items-center justify-center transition-colors" style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }}>
                 <svg className={cn(getIconSize(4), "text-muted-foreground/50")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
@@ -508,6 +519,8 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      </div>{/* End right columns container */}
     </div>
   )
 }

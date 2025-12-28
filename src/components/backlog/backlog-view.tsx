@@ -82,33 +82,31 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
 
-  // Handle external task selection request
+  // Handle external task selection request (e.g., from email link with ?task=)
   useEffect(() => {
     if (taskToOpen && taskToOpen !== lastOpenedTaskId) {
       setLastOpenedTaskId(taskToOpen)
+      // Close sprint view if open, so the sidebar can show in the backlog
+      setViewingSprint(null)
       async function openTask() {
         try {
           const res = await fetch(`/api/tasks/${taskToOpen}`)
           if (res.ok) {
             const task = await res.json()
             setSelectedTask(task)
-            // If task is in a sprint, open that sprint view
-            if (task.sprintId) {
-              const sprint = sprints.find(s => s.id === task.sprintId)
-              if (sprint) {
-                setViewingSprint(sprint)
-              }
-            }
+            // Update URL to show task parameter (in case it's not already set)
+            const url = new URL(window.location.href)
+            url.searchParams.set('task', task.id)
+            window.history.replaceState({}, '', url.toString())
+            // Stay in backlog view - just show the details panel, don't redirect to sprint view
           }
         } catch (error) {
           console.error('Failed to fetch task:', error)
         }
       }
       openTask()
-      // Clear taskToOpen after processing (via parent callback if available, or just track it)
-      // The parent will clear it when taskToOpen changes
     }
-  }, [taskToOpen, lastOpenedTaskId, sprints])
+  }, [taskToOpen, lastOpenedTaskId])
 
   // Sync state when project changes (props update)
   useEffect(() => {
@@ -541,6 +539,18 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task)
+    // Update URL to show task parameter
+    const url = new URL(window.location.href)
+    url.searchParams.set('task', task.id)
+    window.history.pushState({}, '', url.toString())
+  }, [])
+
+  const handleTaskClose = useCallback(() => {
+    setSelectedTask(null)
+    // Clear task parameter from URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('task')
+    window.history.pushState({}, '', url.toString())
   }, [])
 
   const handleTaskUpdate = useCallback((updatedTask: Task) => {
@@ -605,6 +615,10 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
     })))
     setBacklogTasks(prev => prev.filter(t => t.id !== taskId))
     setSelectedTask(null)
+    // Clear task parameter from URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('task')
+    window.history.pushState({}, '', url.toString())
   }, [])
 
   const handleTaskSplit = useCallback((newTask: Task) => {
@@ -1063,7 +1077,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
         )}
 
         {/* Task detail sidebar - inline next to content */}
-        {selectedTask && (
+        {/* Only show BacklogView's sidebar when NOT viewing a sprint (SprintView has its own) */}
+        {selectedTask && !currentViewingSprint && (
           <TaskDetailSidebar
             task={selectedTask}
             users={users}
@@ -1072,7 +1087,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             currentUserId={currentUser?.id}
             currentUserRole={currentUser?.role}
             projectId={projectId}
-            onClose={() => setSelectedTask(null)}
+            onClose={handleTaskClose}
             onUpdate={handleTaskUpdate}
             onDelete={handleTaskDelete}
             onSplit={handleTaskSplit}
@@ -1083,6 +1098,10 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                 if (res.ok) {
                   const task = await res.json()
                   setSelectedTask(task)
+                  // Update URL to show task parameter
+                  const url = new URL(window.location.href)
+                  url.searchParams.set('task', taskId)
+                  window.history.pushState({}, '', url.toString())
                 }
               } catch (error) {
                 console.error('Failed to fetch task:', error)

@@ -75,10 +75,8 @@ export function AppShell({
     if (taskParam) {
       setTaskToOpen(taskParam)
       handleViewChange('backlog')
-      // Clear the URL parameter after reading it
-      window.history.replaceState({}, '', window.location.pathname)
-      // Clear taskToOpen after processing
-      setTimeout(() => setTaskToOpen(null), 100)
+      // Don't clear the URL - keep the task parameter so users can see which task they're viewing
+      // BacklogView uses lastOpenedTaskId to prevent duplicate processing, so no need to clear taskToOpen
     }
   }, [searchParams, handleViewChange])
 

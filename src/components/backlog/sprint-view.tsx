@@ -138,7 +138,7 @@ function SortableTaskRow({
         }
       }}
       className={cn(
-        "flex items-center gap-3 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
+        "relative flex items-center gap-3 px-3 border-b last:border-b-0 hover:bg-accent/50 transition-colors",
         getRowHeightClass(),
         canEdit && "active:cursor-grabbing",
         isDragging && "opacity-50 bg-background shadow-lg cursor-grabbing",
@@ -175,16 +175,16 @@ function SortableTaskRow({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-36">
-            <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'team', null)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'team', null) }}>
               <span className="text-muted-foreground">No Team</span>
             </DropdownMenuItem>
             {teams.map((team) => (
-              <DropdownMenuItem 
-                key={team.key} 
-                onClick={() => onInlineUpdate(task.id, 'team', team.key)}
+              <DropdownMenuItem
+                key={team.key}
+                onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'team', team.key) }}
               >
-                <span 
-                  className="w-2 h-2 rounded-full mr-2" 
+                <span
+                  className="w-2 h-2 rounded-full mr-2"
                   style={{ backgroundColor: team.color }}
                 />
                 {team.name}
@@ -233,18 +233,31 @@ function SortableTaskRow({
         )}
       </div>
 
-      {/* Epic - Inline Dropdown - positioned more centrally */}
-      <div className="w-32 flex-shrink-0 mx-4" onClick={(e) => e.stopPropagation()}>
+      {/* Right columns container - ABSOLUTE: always visible, pins to right edge, overlays title */}
+      <div className={cn(
+        "absolute right-0 top-0 bottom-0 flex items-center gap-2 z-10 pl-8 pr-3",
+        // Match row background states
+        "bg-card",
+        isSelected && "!bg-primary/10",
+        isActive && "!bg-blue-50 dark:!bg-blue-950/20",
+        // Left fade gradient to show content underneath
+        "before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-8 before:-translate-x-full before:bg-gradient-to-r before:from-transparent before:to-card",
+        isSelected && "before:!bg-gradient-to-r before:!from-transparent before:!to-primary/10",
+        isActive && "before:!bg-gradient-to-r before:!from-transparent before:!to-blue-50 dark:before:!to-blue-950/20"
+      )}>
+
+      {/* Epic - Inline Dropdown - responsive width, full text on large screens */}
+      <div className="w-24 sm:w-28 md:w-32 lg:w-auto lg:min-w-[120px] lg:max-w-[200px] xl:max-w-[280px]" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full text-left hover:opacity-80 transition-opacity">
               {task.epic ? (
-                <Badge 
-                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer truncate max-w-full")}
-                  style={{ 
-                    backgroundColor: `${task.epic.color}20`, 
+                <Badge
+                  className={cn(getTextSize('xs'), "font-medium px-2.5 py-1 cursor-pointer max-w-full truncate lg:overflow-visible lg:text-clip lg:whitespace-nowrap")}
+                  style={{
+                    backgroundColor: `${task.epic.color}20`,
                     color: task.epic.color,
-                    borderColor: task.epic.color 
+                    borderColor: task.epic.color
                   }}
                   variant="outline"
                 >
@@ -258,16 +271,16 @@ function SortableTaskRow({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-48">
-            <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'epicId', null)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'epicId', null) }}>
               <span className="text-muted-foreground">No Epic</span>
             </DropdownMenuItem>
             {epics.map((epic) => (
-              <DropdownMenuItem 
-                key={epic.id} 
-                onClick={() => onInlineUpdate(task.id, 'epicId', epic.id)}
+              <DropdownMenuItem
+                key={epic.id}
+                onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'epicId', epic.id) }}
               >
-                <span 
-                  className="w-2 h-2 rounded-full mr-2 flex-shrink-0" 
+                <span
+                  className="w-2 h-2 rounded-full mr-2 flex-shrink-0"
                   style={{ backgroundColor: epic.color }}
                 />
                 <span className="truncate">{epic.name}</span>
@@ -278,7 +291,7 @@ function SortableTaskRow({
       </div>
 
       {/* Status - Inline Dropdown */}
-      <div className="w-32 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="w-20 sm:w-24 md:w-28" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="hover:opacity-80 transition-opacity">
@@ -294,12 +307,12 @@ function SortableTaskRow({
             {statuses.map((s) => {
               const sConfig = getStatusConfig(s.key as TaskStatus)
               return (
-                <DropdownMenuItem 
-                  key={s.key} 
-                  onClick={() => onInlineUpdate(task.id, 'status', s.key)}
+                <DropdownMenuItem
+                  key={s.key}
+                  onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'status', s.key) }}
                 >
-                  <span 
-                    className="w-2 h-2 rounded-full mr-2" 
+                  <span
+                    className="w-2 h-2 rounded-full mr-2"
                     style={{ backgroundColor: sConfig.color }}
                   />
                   {s.name}
@@ -311,7 +324,7 @@ function SortableTaskRow({
       </div>
 
       {/* Priority - Inline Dropdown */}
-      <div className="w-10 flex-shrink-0 text-center" onClick={(e) => e.stopPropagation()}>
+      <div className="w-8 sm:w-10 text-center" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="hover:opacity-80 transition-opacity">
@@ -322,9 +335,9 @@ function SortableTaskRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-32">
             {Object.entries(priorityConfig).map(([key, config]) => (
-              <DropdownMenuItem 
-                key={key} 
-                onClick={() => onInlineUpdate(task.id, 'priority', key)}
+              <DropdownMenuItem
+                key={key}
+                onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'priority', key) }}
               >
                 <span className={cn("font-bold mr-2", config.color)}>{config.icon}</span>
                 {config.label}
@@ -335,12 +348,12 @@ function SortableTaskRow({
       </div>
 
       {/* Assignee - Inline Dropdown */}
-      <div className="flex-shrink-0" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }} onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="hover:opacity-80 transition-opacity">
               {task.assignee ? (
-                <Avatar style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} className="cursor-pointer">
+                <Avatar style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }} className="cursor-pointer">
                   {task.assignee.avatarUrl ? (
                     <AvatarImage src={task.assignee.avatarUrl} alt={task.assignee.name} />
                   ) : null}
@@ -349,18 +362,18 @@ function SortableTaskRow({
                   </AvatarFallback>
                 </Avatar>
               ) : (
-                <div className="rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground cursor-pointer" style={{ width: `${9 * getScale() * 0.25}rem`, height: `${9 * getScale() * 0.25}rem` }} />
+                <div className="rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-muted-foreground cursor-pointer" style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }} />
               )}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => onInlineUpdate(task.id, 'assigneeId', null)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'assigneeId', null) }}>
               <span className="text-muted-foreground">Unassigned</span>
             </DropdownMenuItem>
             {users.map((user) => (
-              <DropdownMenuItem 
-                key={user.id} 
-                onClick={() => onInlineUpdate(task.id, 'assigneeId', user.id)}
+              <DropdownMenuItem
+                key={user.id}
+                onClick={(e) => { e.stopPropagation(); onInlineUpdate(task.id, 'assigneeId', user.id) }}
               >
                 <Avatar className="w-5 h-5 mr-2">
                   {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
@@ -374,6 +387,8 @@ function SortableTaskRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      </div>{/* End right columns container */}
     </div>
   )
 }
@@ -477,6 +492,22 @@ export function SprintView({
     setSelectedTask(updatedTask)
   }, [onTaskUpdate])
 
+  const handleTaskClick = useCallback((task: Task) => {
+    setSelectedTask(task)
+    // Update URL to show task parameter
+    const url = new URL(window.location.href)
+    url.searchParams.set('task', task.id)
+    window.history.pushState({}, '', url.toString())
+  }, [])
+
+  const handleTaskClose = useCallback(() => {
+    setSelectedTask(null)
+    // Clear task parameter from URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('task')
+    window.history.pushState({}, '', url.toString())
+  }, [])
+
   const handleTaskDelete = useCallback((taskId: string) => {
     setLocalSprint(prev => ({
       ...prev,
@@ -484,6 +515,10 @@ export function SprintView({
     }))
     onTaskDelete?.(taskId)
     setSelectedTask(null)
+    // Clear task parameter from URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('task')
+    window.history.pushState({}, '', url.toString())
   }, [onTaskDelete])
 
   const handleTaskCreate = useCallback((newTask: Task) => {
@@ -760,7 +795,7 @@ export function SprintView({
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-6 gap-3 mb-8">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3 mb-8">
             <div className="bg-gray-50 dark:bg-gray-950/30 border border-gray-200 dark:border-gray-800 rounded-lg p-3">
               <div className="text-xl font-bold text-gray-600 dark:text-gray-400">{tasksByStatus.TODO}</div>
               <div className="text-xs text-gray-600/70 dark:text-gray-400/70">To Do</div>
@@ -923,7 +958,7 @@ export function SprintView({
                         task={task}
                         onClick={() => {
                           if (!selectedTaskIds.has(task.id)) {
-                            setSelectedTask(task)
+                            handleTaskClick(task)
                           }
                         }}
                         canEdit={canEdit}
@@ -956,7 +991,7 @@ export function SprintView({
                 users={users}
                 onTaskClick={(task) => {
                   if (!selectedTaskIds.has(task.id)) {
-                    setSelectedTask(task)
+                    handleTaskClick(task)
                   }
                 }}
                 onTaskStatusChange={async (taskId, newStatus) => {
@@ -1000,7 +1035,7 @@ export function SprintView({
           currentUserId={currentUser?.id}
           currentUserRole={currentUser?.role}
           projectId={projectId}
-          onClose={() => setSelectedTask(null)}
+          onClose={handleTaskClose}
           onUpdate={handleTaskUpdate}
           onDelete={handleTaskDelete}
           onSplit={handleTaskSplit}
@@ -1010,6 +1045,10 @@ export function SprintView({
               if (res.ok) {
                 const task = await res.json()
                 setSelectedTask(task)
+                // Update URL to show task parameter
+                const url = new URL(window.location.href)
+                url.searchParams.set('task', taskId)
+                window.history.pushState({}, '', url.toString())
               }
             } catch (error) {
               console.error('Failed to fetch task:', error)

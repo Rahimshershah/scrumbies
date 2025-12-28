@@ -46,27 +46,33 @@ export function getUploadsDir(): string {
 // Normalize avatar URL to use API route for standalone builds
 export function normalizeAvatarUrl(url: string | null | undefined): string | null {
   if (!url) return null
-  
+
+  // If it's a data URL (base64 encoded image), return as is
+  // This is commonly used for project logos
+  if (url.startsWith('data:')) {
+    return url
+  }
+
   // If already using API route, return as is
   if (url.startsWith('/api/uploads/avatars/')) {
     return url
   }
-  
+
   // Convert /uploads/avatars/ to /api/uploads/avatars/
   if (url.startsWith('/uploads/avatars/')) {
     return url.replace('/uploads/avatars/', '/api/uploads/avatars/')
   }
-  
+
   // If it's a full URL (http/https), return as is
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url
   }
-  
+
   // If it's already an API route but different format, ensure it's correct
   if (url.startsWith('/api/')) {
     return url
   }
-  
+
   // Default: assume it needs API route prefix
   return url.startsWith('/') ? `/api${url}` : `/api/uploads/avatars/${url}`
 }

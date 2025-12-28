@@ -4,7 +4,9 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Scrumbies - Sprint Backlog',
-  description: 'Sprint backlog management tool',
+  description: 'Sprint backlog management tool for agile teams',
+  applicationName: 'Scrumbies',
+  keywords: ['scrum', 'agile', 'sprint', 'backlog', 'project management', 'kanban'],
 }
 
 export default function RootLayout({

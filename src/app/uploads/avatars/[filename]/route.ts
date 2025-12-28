@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { getUploadsDir } from '@/lib/utils'
 
 export async function GET(
   request: NextRequest,
@@ -9,19 +10,39 @@ export async function GET(
 ) {
   try {
     const { filename } = await params
-    
+
     // Security: prevent directory traversal
     if (filename.includes('..') || filename.includes('/')) {
       return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
     }
 
-    const filePath = join(process.cwd(), 'public', 'uploads', 'avatars', filename)
-    
-    if (!existsSync(filePath)) {
+    // Use the same uploads directory resolution as the upload route
+    const baseUploadsDir = getUploadsDir()
+    const avatarsDir = join(baseUploadsDir, 'avatars')
+
+    // Check multiple possible locations for backward compatibility
+    const possiblePaths = [
+      join(avatarsDir, filename), // New location
+      join(process.cwd(), 'public', 'uploads', 'avatars', filename), // Old dev location
+      join(process.cwd(), 'uploads', 'avatars', filename), // Standalone relative
+      join(process.cwd(), '..', 'uploads', 'avatars', filename), // Standalone parent
+      join('/var/www/scrumbies', 'uploads', 'avatars', filename), // Production absolute
+    ]
+
+    let foundPath: string | null = null
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        foundPath = path
+        break
+      }
+    }
+
+    if (!foundPath) {
+      console.error(`Avatar file not found: ${filename}. Checked paths:`, possiblePaths)
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
-    const fileBuffer = await readFile(filePath)
+    const fileBuffer = await readFile(foundPath)
     
     // Determine content type based on file extension
     const ext = filename.split('.').pop()?.toLowerCase()
@@ -43,6 +64,7 @@ export async function GET(
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
 
 
 

@@ -28,13 +28,20 @@ export default async function Home() {
     redirect('/login')
   }
 
-  // Fetch user's projects
+  // Fetch user's projects with explicit fields
   const projects = await prisma.project.findMany({
     where: {
       OR: [
         { members: { some: { id: session.user.id } } },
         { createdById: session.user.id },
       ],
+    },
+    select: {
+      id: true,
+      name: true,
+      key: true,
+      logoUrl: true,
+      createdAt: true,
     },
     orderBy: { createdAt: 'asc' },
   })

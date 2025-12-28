@@ -105,6 +105,7 @@ export function TaskDetailSidebar({
   const [splitTransferDescription, setSplitTransferDescription] = useState(true)
   const [activities, setActivities] = useState<Activity[]>([])
   const [comments, setComments] = useState<Comment[]>([])
+  const [loadingComments, setLoadingComments] = useState(true)
   const [newComment, setNewComment] = useState('')
   const [commentMentions, setCommentMentions] = useState<string[]>([])
   const [descriptionMentions, setDescriptionMentions] = useState<string[]>([])
@@ -147,17 +148,31 @@ export function TaskDetailSidebar({
 
   // Load activities, comments, chain, attachments, and linked documents
   useEffect(() => {
+    const abortController = new AbortController()
+    const currentTaskId = task.id
+
+    // Clear previous data immediately when task changes
+    setComments([])
+    setActivities([])
+    setAttachments([])
+    setLinkedDocuments([])
+    setTaskChain(null)
+    setLoadingComments(true)
+
     async function loadData() {
       setLoadingActivity(true)
       setLoadingChain(true)
       try {
         const [actRes, commentsRes, chainRes, attachRes, docsRes] = await Promise.all([
-          fetch(`/api/tasks/${task.id}/activities`),
-          fetch(`/api/tasks/${task.id}/comments`),
-          fetch(`/api/tasks/${task.id}/chain`),
-          fetch(`/api/tasks/${task.id}/attachments`),
-          fetch(`/api/tasks/${task.id}/documents`),
+          fetch(`/api/tasks/${currentTaskId}/activities`, { signal: abortController.signal }),
+          fetch(`/api/tasks/${currentTaskId}/comments`, { signal: abortController.signal }),
+          fetch(`/api/tasks/${currentTaskId}/chain`, { signal: abortController.signal }),
+          fetch(`/api/tasks/${currentTaskId}/attachments`, { signal: abortController.signal }),
+          fetch(`/api/tasks/${currentTaskId}/documents`, { signal: abortController.signal }),
         ])
+
+        // Don't update state if this request was aborted or task changed
+        if (abortController.signal.aborted) return
 
         if (actRes.ok) setActivities(await actRes.json())
         if (commentsRes.ok) setComments(await commentsRes.json())
@@ -165,13 +180,23 @@ export function TaskDetailSidebar({
         if (attachRes.ok) setAttachments(await attachRes.json())
         if (docsRes.ok) setLinkedDocuments(await docsRes.json())
       } catch (error) {
+        // Ignore abort errors - they're expected when switching tasks quickly
+        if (error instanceof Error && error.name === 'AbortError') return
         console.error('Failed to load task data:', error)
       } finally {
-        setLoadingActivity(false)
-        setLoadingChain(false)
+        if (!abortController.signal.aborted) {
+          setLoadingActivity(false)
+          setLoadingChain(false)
+          setLoadingComments(false)
+        }
       }
     }
     loadData()
+
+    // Cleanup: abort any in-flight requests when task changes
+    return () => {
+      abortController.abort()
+    }
   }, [task.id])
 
   // Resize handlers
@@ -503,14 +528,14 @@ export function TaskDetailSidebar({
 
   return (
     <>
-      <div 
+      <div
         ref={sidebarRef}
-        className="h-full bg-background border-l flex flex-shrink-0 relative"
-        style={{ width: sidebarWidth }}
+        className="h-full bg-background border-l flex flex-shrink-0 relative fixed md:relative inset-0 md:inset-auto z-50 md:z-auto"
+        style={{ width: sidebarWidth, maxWidth: '100vw' }}
       >
-        {/* Resize handle */}
+        {/* Resize handle - hidden on mobile */}
         <div
-          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10 -ml-0.5"
+          className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10 -ml-0.5"
           onMouseDown={startResizing}
         />
 
@@ -541,8 +566,8 @@ export function TaskDetailSidebar({
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4 overflow-hidden">
+          <ScrollArea className="flex-1 w-full">
+            <div className="p-4 space-y-4 max-w-full overflow-x-hidden">
               {/* Title */}
               <div>
                 {readOnly ? (
@@ -820,12 +845,14 @@ export function TaskDetailSidebar({
               )}
 
               {/* Description */}
-              <div className="border-t pt-4">
+              <div className="border-t pt-4 min-w-0">
                 <label className="text-sm font-semibold mb-2 block">Description</label>
-                <div className="overflow-x-auto max-w-full">
+                <div className="overflow-x-auto max-w-full min-w-0 [&_table]:max-w-[calc(100%-1rem)] [&_.ProseMirror]:max-w-full">
                   {readOnly ? (
                     description ? (
-                      <RichTextDisplay content={description} className="text-sm" />
+                      <div className="max-w-full overflow-hidden">
+                        <RichTextDisplay content={description} className="text-sm [&_.ProseMirror]:max-w-full" />
+                      </div>
                     ) : (
                       <p className="text-sm text-muted-foreground italic">No description</p>
                     )
@@ -845,12 +872,12 @@ export function TaskDetailSidebar({
 
               {/* Attachments */}
               <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold">Attachments {attachments.length > 0 && `(${attachments.length})`}</span>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-sm font-semibold truncate">Attachments {attachments.length > 0 && `(${attachments.length})`}</span>
                   {!readOnly && (
                     <>
                       <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" />
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs flex-shrink-0" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}>
                         {uploadingFile ? 'Uploading...' : '+ Attach'}
                       </Button>
                     </>
@@ -974,8 +1001,8 @@ export function TaskDetailSidebar({
                           minimal
                           users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
                         />
-                        <div className="flex justify-end">
-                          <Button size="sm" onClick={handleAddComment} disabled={!newComment.trim() || newComment === '<p></p>'}>
+                        <div className="flex justify-end pr-1">
+                          <Button size="sm" className="flex-shrink-0" onClick={handleAddComment} disabled={!newComment.trim() || newComment === '<p></p>'}>
                             Comment
                           </Button>
                         </div>
@@ -984,7 +1011,14 @@ export function TaskDetailSidebar({
 
                     {/* Comments list - newest first */}
                     <div className="space-y-4">
-                      {comments.length === 0 ? (
+                      {loadingComments ? (
+                        <div className="flex items-center justify-center py-4">
+                          <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          <span className="ml-2 text-sm text-muted-foreground">Loading comments...</span>
+                        </div>
+                      ) : comments.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">No comments yet</p>
                       ) : (
                         [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((comment) => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Epic, Task, Sprint } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +29,43 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
   const [loading, setLoading] = useState(true)
   const [epicsWithTasks, setEpicsWithTasks] = useState<EpicWithTasks[]>([])
   const [view, setView] = useState<'timeline' | 'list'>('timeline')
+
+  // Resizable left panel
+  const [leftPanelWidth, setLeftPanelWidth] = useState(208) // w-52 = 208px
+  const isResizing = useRef(false)
+  const startX = useRef(0)
+  const startWidth = useRef(0)
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    isResizing.current = true
+    startX.current = e.clientX
+    startWidth.current = leftPanelWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [leftPanelWidth])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return
+      const diff = e.clientX - startX.current
+      const newWidth = Math.max(150, Math.min(500, startWidth.current + diff))
+      setLeftPanelWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      isResizing.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
 
   // Fetch epic details with tasks
   useEffect(() => {
@@ -258,8 +295,16 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
             {/* Week headers */}
             <div className="sticky top-0 bg-background z-10 border-b">
               <div className="flex">
-                <div className="w-52 flex-shrink-0 px-2 py-1.5 border-r font-medium text-xs text-muted-foreground">
+                <div
+                  className="flex-shrink-0 px-2 py-1.5 border-r font-medium text-xs text-muted-foreground relative"
+                  style={{ width: leftPanelWidth }}
+                >
                   Epic
+                  {/* Resize handle */}
+                  <div
+                    className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors"
+                    onMouseDown={handleMouseDown}
+                  />
                 </div>
                 <div className="flex-1 flex">
                   {weeks.map((week, i) => (
@@ -290,7 +335,10 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                   {/* Epic Row */}
                   <div className="flex bg-muted/20">
                     {/* Epic info */}
-                    <div className="w-52 flex-shrink-0 px-2 py-1.5 border-r bg-muted/30">
+                    <div
+                      className="flex-shrink-0 px-2 py-1.5 border-r bg-muted/30 relative"
+                      style={{ width: leftPanelWidth }}
+                    >
                       <button
                         onClick={() => onEpicClick(epic.id)}
                         className="text-left w-full"
@@ -371,7 +419,10 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
                   {(epic.tasks || []).length > 0 && (
                     <div className="flex">
                       {/* Task list sidebar */}
-                      <div className="w-52 flex-shrink-0 border-r bg-background">
+                      <div
+                        className="flex-shrink-0 border-r bg-background relative"
+                        style={{ width: leftPanelWidth }}
+                      >
                         {(epic.tasks || []).map((task: any) => (
                           <button
                             key={task.id}

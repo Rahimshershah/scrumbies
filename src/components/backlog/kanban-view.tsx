@@ -362,7 +362,7 @@ export function KanbanView({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-6 gap-4 h-full overflow-x-auto">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 h-full overflow-x-auto pb-4">
         {orderedStatuses.map((status) => (
           <KanbanColumn
             key={status}

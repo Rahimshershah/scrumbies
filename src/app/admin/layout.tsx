@@ -30,6 +30,12 @@ export default async function AdminRootLayout({
         { createdById: session.user.id },
       ],
     },
+    select: {
+      id: true,
+      name: true,
+      key: true,
+      logoUrl: true,
+    },
     orderBy: { createdAt: 'asc' },
   })
 
@@ -43,6 +49,7 @@ export default async function AdminRootLayout({
     </AdminLayout>
   )
 }
+
 
 
 

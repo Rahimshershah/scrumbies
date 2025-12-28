@@ -111,3 +111,4 @@ function getContentType(ext: string | undefined): string {
   return mimeTypes[ext || ''] || 'application/octet-stream'
 }
 
+
