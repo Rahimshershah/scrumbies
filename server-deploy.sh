@@ -29,6 +29,18 @@ echo "=== Building application ==="
 npm run build
 
 echo ""
+echo "=== Preparing standalone build ==="
+# Copy static files to standalone
+cp -r .next/static .next/standalone/.next/static
+# Copy public folder to standalone
+cp -r public .next/standalone/public
+# Copy .env to standalone
+cp .env .next/standalone/.env
+# Ensure uploads directory exists in standalone
+mkdir -p .next/standalone/uploads
+cp -r uploads/* .next/standalone/uploads/ 2>/dev/null || true
+
+echo ""
 echo "=== Restarting PM2 ==="
 pm2 restart scrumbies --update-env
 
