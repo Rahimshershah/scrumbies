@@ -29,8 +29,26 @@ echo "=== Building application ==="
 npm run build
 
 echo ""
+echo "=== Setting up standalone build ==="
+# Copy static files
+cp -r .next/static .next/standalone/.next/
+
+# Copy public folder
+cp -r public .next/standalone/
+
+# Copy .env file
+cp .env .next/standalone/
+
+# Create uploads symlink (so uploads persist across deploys)
+rm -rf .next/standalone/uploads
+ln -sf /var/www/scrumbies/uploads .next/standalone/uploads
+
+echo ""
 echo "=== Restarting PM2 ==="
-pm2 restart scrumbies --update-env
+pm2 delete scrumbies 2>/dev/null || true
+cd .next/standalone
+pm2 start server.js --name scrumbies
+pm2 save
 
 echo ""
 echo "=== Deployment complete! ==="
