@@ -179,18 +179,19 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   // Non-closed sprints for drag-drop
   const visibleSprints = [...activeSprints, ...plannedSprints]
   
-  // Filter tasks based on search query and filters
+  // Filter and sort tasks based on search query and filters
+  // Sort by order field to ensure correct drag-drop calculations
   const filteredActiveSprints = activeSprints.map(sprint => ({
     ...sprint,
-    tasks: sprint.tasks.filter(task => matchesFilters(task))
+    tasks: [...sprint.tasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
   })).filter(sprint => sprint.tasks.length > 0 || (!searchQuery.trim() && filterPriority === 'ALL' && filterAssignee === 'ALL' && filterStatus === 'ALL'))
-  
+
   const filteredPlannedSprints = plannedSprints.map(sprint => ({
     ...sprint,
-    tasks: sprint.tasks.filter(task => matchesFilters(task))
+    tasks: [...sprint.tasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
   })).filter(sprint => sprint.tasks.length > 0 || (!searchQuery.trim() && filterPriority === 'ALL' && filterAssignee === 'ALL' && filterStatus === 'ALL'))
-  
-  const filteredBacklogTasks = backlogTasks.filter(task => matchesFilters(task))
+
+  const filteredBacklogTasks = [...backlogTasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
   
   // Calculate total tasks (for display)
   const totalTasks = visibleSprints.reduce((sum, s) => sum + s.tasks.length, 0) + backlogTasks.length
@@ -365,17 +366,20 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
 
     // Same container reordering - no confirmation needed
     if (sprint) {
-      const oldIndex = sprint.tasks.findIndex((t) => t.id === activeId)
-      let newIndex = sprint.tasks.findIndex((t) => t.id === overId)
+      // Sort tasks by order for accurate position calculations
+      const sortedTasks = [...sprint.tasks].sort((a, b) => a.order - b.order)
+      const oldIndex = sortedTasks.findIndex((t) => t.id === activeId)
+      let newIndex = sortedTasks.findIndex((t) => t.id === overId)
 
       if (newIndex === -1) {
-        newIndex = sprint.tasks.length - 1
+        newIndex = sortedTasks.length - 1
       }
 
       if (oldIndex !== newIndex) {
         setSprints((prev) => {
           const sprintIdx = prev.findIndex((s) => s.id === sprint.id)
-          const newTasks = arrayMove(prev[sprintIdx].tasks, oldIndex, newIndex)
+          const sprintSortedTasks = [...prev[sprintIdx].tasks].sort((a, b) => a.order - b.order)
+          const newTasks = arrayMove(sprintSortedTasks, oldIndex, newIndex)
           const newSprints = [...prev]
           newSprints[sprintIdx] = { ...newSprints[sprintIdx], tasks: newTasks }
           return newSprints
@@ -397,15 +401,20 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
         console.error('Failed to reorder task:', error)
       }
     } else if (isInBacklog) {
-      const oldIndex = backlogTasks.findIndex((t) => t.id === activeId)
-      let newIndex = backlogTasks.findIndex((t) => t.id === overId)
+      // Sort backlog tasks by order for accurate position calculations
+      const sortedBacklog = [...backlogTasks].sort((a, b) => a.order - b.order)
+      const oldIndex = sortedBacklog.findIndex((t) => t.id === activeId)
+      let newIndex = sortedBacklog.findIndex((t) => t.id === overId)
 
       if (newIndex === -1) {
-        newIndex = backlogTasks.length - 1
+        newIndex = sortedBacklog.length - 1
       }
 
       if (oldIndex !== newIndex) {
-        setBacklogTasks((prev) => arrayMove(prev, oldIndex, newIndex))
+        setBacklogTasks((prev) => {
+          const sortedPrev = [...prev].sort((a, b) => a.order - b.order)
+          return arrayMove(sortedPrev, oldIndex, newIndex)
+        })
       }
 
       // Persist to server
@@ -961,6 +970,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     sprint={sprint}
                     users={users}
                     epics={epics}
+                    allSprints={sprints}
                     availableSprints={filteredPlannedSprints}
                     projectId={projectId}
                     onTaskClick={handleTaskClick}
@@ -970,7 +980,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     onStatusChange={handleSprintStatusChange}
                     onSprintUpdate={handleSprintUpdate}
                     onSprintComplete={(completedSprint) => {
-                      setSprints(prev => prev.map(s => 
+                      setSprints(prev => prev.map(s =>
                         s.id === completedSprint.id ? completedSprint : s
                       ))
                     }}
@@ -998,6 +1008,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     sprint={sprint}
                     users={users}
                     epics={epics}
+                    allSprints={sprints}
                     availableSprints={filteredPlannedSprints.filter(s => s.id !== sprint.id)}
                     projectId={projectId}
                     onTaskClick={handleTaskClick}
@@ -1028,6 +1039,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                   tasks={filteredBacklogTasks}
                   users={users}
                   epics={epics}
+                  sprints={sprints}
                   projectId={projectId}
                   onTaskClick={handleTaskClick}
                   onCreateTask={handleCreateTask}

@@ -23,6 +23,7 @@ interface SprintSectionProps {
   sprint: Sprint
   users: { id: string; name: string; avatarUrl?: string | null }[]
   epics?: Epic[]
+  allSprints?: Sprint[] // All sprints for task move dropdown
   availableSprints?: Sprint[] // For complete modal - planned sprints
   projectId?: string
   onTaskClick: (task: Task) => void
@@ -46,6 +47,7 @@ export function SprintSection({
   sprint,
   users,
   epics = [],
+  allSprints = [],
   availableSprints = [],
   projectId,
   onTaskClick,
@@ -67,8 +69,10 @@ export function SprintSection({
     id: sprint.id,
   })
 
+  // Sort tasks by order field to ensure correct drag-drop calculations
+  const sortedTasks = [...sprint.tasks].sort((a, b) => a.order - b.order)
   const taskCount = sprint.tasks.length
-  const taskIds = sprint.tasks.map((t) => t.id)
+  const taskIds = sortedTasks.map((t) => t.id)
   const openTasksCount = sprint.tasks.filter(t => t.status !== 'DONE').length
   
   // Count tasks with splits (tasks that have been split into others)
@@ -265,12 +269,13 @@ export function SprintSection({
           )}
         >
           <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-            {sprint.tasks.map((task) => (
+            {sortedTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
                 users={users}
                 epics={epics}
+                sprints={allSprints}
                 onClick={() => onTaskClick(task)}
                 onUpdate={onTaskUpdate}
                 isActive={selectedTaskId === task.id}

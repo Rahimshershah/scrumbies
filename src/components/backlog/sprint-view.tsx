@@ -468,9 +468,12 @@ export function SprintView({
   const totalTasks = localSprint.tasks.length
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
-  const filteredTasks = filterStatus === 'ALL' 
-    ? localSprint.tasks 
-    : localSprint.tasks.filter(t => t.status === filterStatus)
+  // Sort tasks by order field to ensure correct drag-drop calculations
+  const sortedTasks = [...localSprint.tasks].sort((a, b) => a.order - b.order)
+
+  const filteredTasks = filterStatus === 'ALL'
+    ? sortedTasks
+    : sortedTasks.filter(t => t.status === filterStatus)
 
   // Group tasks by status for summary
   const tasksByStatus: Record<TaskStatus | 'ALL', number> = {

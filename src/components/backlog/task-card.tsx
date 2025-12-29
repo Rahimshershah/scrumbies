@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Task, TaskStatus, Priority, Epic } from '@/types'
+import { Task, TaskStatus, Priority, Epic, Sprint } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -28,12 +28,13 @@ interface TaskCardProps {
   task: Task
   users?: { id: string; name: string; avatarUrl?: string | null }[]
   epics?: Epic[]
+  sprints?: Sprint[]
   onClick: () => void
   onUpdate?: (task: Task) => void
   isActive?: boolean
 }
 
-export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isActive = false }: TaskCardProps) {
+export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, onUpdate, isActive = false }: TaskCardProps) {
   const { statuses, teams, getStatusConfig, getTeamConfig } = useProjectSettings()
   const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
@@ -144,6 +145,26 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
       console.error('Failed to update team:', error)
     }
   }
+
+  async function handleSprintChange(sprintId: string | null) {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sprintId }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        onUpdate?.(updated)
+      }
+    } catch (error) {
+      console.error('Failed to update sprint:', error)
+    }
+  }
+
+  // Filter sprints to only show active and planned ones
+  const availableSprints = sprints.filter(s => s.status !== 'COMPLETED')
+  const currentSprint = sprints.find(s => s.id === task.sprintId)
 
   return (
     <div
@@ -354,6 +375,54 @@ export function TaskCard({ task, users = [], epics = [], onClick, onUpdate, isAc
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Sprint dropdown - hidden on small screens */}
+      {sprints.length > 0 && (
+        <div className="hidden lg:block w-24" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full text-left hover:opacity-80 transition-opacity">
+                <Badge variant="outline" className={cn(getTextSize('xs'), "font-medium px-2 py-0.5 cursor-pointer max-w-full truncate")}>
+                  {currentSprint?.name || 'Backlog'}
+                </Badge>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuLabel className={getTextSize('xs')}>Move to Sprint</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleSprintChange(null)
+                }}
+                className={cn(!task.sprintId && "bg-accent")}
+              >
+                <span className="text-muted-foreground">Backlog</span>
+              </DropdownMenuItem>
+              {availableSprints.map((sprint) => (
+                <DropdownMenuItem
+                  key={sprint.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleSprintChange(sprint.id)
+                  }}
+                  className={cn(task.sprintId === sprint.id && "bg-accent")}
+                >
+                  <span className="truncate">{sprint.name}</span>
+                  {sprint.status === 'ACTIVE' && (
+                    <Badge className="ml-2 bg-green-500 text-[9px] h-4 px-1">Active</Badge>
+                  )}
+                  {task.sprintId === sprint.id && (
+                    <svg className="w-4 h-4 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
       {/* Status dropdown - always visible, fixed width */}
       <div className="w-20 sm:w-24 md:w-28">
