@@ -670,12 +670,14 @@ export function SprintView({
     // Calculate new positions for all tasks being moved
     const tasksToMoveIds = new Set(tasksToMove.map(t => t.id))
     const remainingTasks = filteredTasks.filter(t => !tasksToMoveIds.has(t.id))
-    const newTasks = [
+    const reorderedTasks = [
       ...remainingTasks.slice(0, targetIndex),
       ...tasksToMove,
       ...remainingTasks.slice(targetIndex)
     ]
-    
+    // Update order field values to match new array positions
+    const newTasks = reorderedTasks.map((task, idx) => ({ ...task, order: idx }))
+
     // Update local state immediately (optimistic update)
     setLocalSprint(prev => ({
       ...prev,

@@ -123,9 +123,47 @@ export function TaskDetailSidebar({
   const [docSearchResults, setDocSearchResults] = useState<LinkedDocument[]>([])
   const [searchingDocs, setSearchingDocs] = useState(false)
   
-  // Attachment preview
+  // Attachment preview with navigation
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null)
-  
+
+  // Get previewable attachments (images and videos)
+  const previewableAttachments = attachments.filter(a =>
+    a.mimeType.startsWith('image/') || a.mimeType.startsWith('video/')
+  )
+  const currentPreviewIndex = previewAttachment
+    ? previewableAttachments.findIndex(a => a.id === previewAttachment.id)
+    : -1
+
+  const goToPreviousAttachment = useCallback(() => {
+    if (currentPreviewIndex > 0) {
+      setPreviewAttachment(previewableAttachments[currentPreviewIndex - 1])
+    }
+  }, [currentPreviewIndex, previewableAttachments])
+
+  const goToNextAttachment = useCallback(() => {
+    if (currentPreviewIndex < previewableAttachments.length - 1) {
+      setPreviewAttachment(previewableAttachments[currentPreviewIndex + 1])
+    }
+  }, [currentPreviewIndex, previewableAttachments])
+
+  // Keyboard navigation for attachment preview
+  useEffect(() => {
+    if (!previewAttachment) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goToPreviousAttachment()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        goToNextAttachment()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [previewAttachment, goToPreviousAttachment, goToNextAttachment])
+
   // Collapsible sections
   const [detailsOpen, setDetailsOpen] = useState(true)
   
@@ -1283,7 +1321,39 @@ export function TaskDetailSidebar({
               </div>
 
               {/* Preview Content */}
-              <div className="flex-1 overflow-auto bg-black/5 dark:bg-white/5">
+              <div className="flex-1 overflow-auto bg-black/5 dark:bg-white/5 relative">
+                {/* Navigation buttons */}
+                {previewableAttachments.length > 1 && (
+                  <>
+                    {/* Previous button */}
+                    <button
+                      onClick={goToPreviousAttachment}
+                      disabled={currentPreviewIndex <= 0}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      title="Previous (Left Arrow)"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    {/* Next button */}
+                    <button
+                      onClick={goToNextAttachment}
+                      disabled={currentPreviewIndex >= previewableAttachments.length - 1}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      title="Next (Right Arrow)"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    {/* Counter */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-black/50 text-white text-sm">
+                      {currentPreviewIndex + 1} / {previewableAttachments.length}
+                    </div>
+                  </>
+                )}
+
                 {previewAttachment.mimeType.startsWith('image/') && (
                   <div className="flex items-center justify-center p-4 min-h-[400px]">
                     <img

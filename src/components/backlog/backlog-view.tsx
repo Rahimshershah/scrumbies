@@ -379,7 +379,9 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
         setSprints((prev) => {
           const sprintIdx = prev.findIndex((s) => s.id === sprint.id)
           const sprintSortedTasks = [...prev[sprintIdx].tasks].sort((a, b) => a.order - b.order)
-          const newTasks = arrayMove(sprintSortedTasks, oldIndex, newIndex)
+          const movedTasks = arrayMove(sprintSortedTasks, oldIndex, newIndex)
+          // Update order field values to match new array positions
+          const newTasks = movedTasks.map((task, idx) => ({ ...task, order: idx }))
           const newSprints = [...prev]
           newSprints[sprintIdx] = { ...newSprints[sprintIdx], tasks: newTasks }
           return newSprints
@@ -413,7 +415,9 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       if (oldIndex !== newIndex) {
         setBacklogTasks((prev) => {
           const sortedPrev = [...prev].sort((a, b) => a.order - b.order)
-          return arrayMove(sortedPrev, oldIndex, newIndex)
+          const movedTasks = arrayMove(sortedPrev, oldIndex, newIndex)
+          // Update order field values to match new array positions
+          return movedTasks.map((task, idx) => ({ ...task, order: idx }))
         })
       }
 
