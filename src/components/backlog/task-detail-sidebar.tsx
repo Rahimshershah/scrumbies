@@ -1294,9 +1294,9 @@ export function TaskDetailSidebar({
         </DialogContent>
       </Dialog>
 
-      {/* Attachment Preview Modal */}
+      {/* Attachment Preview Modal - Full screen for better visibility */}
       <Dialog open={!!previewAttachment} onOpenChange={(open) => !open && setPreviewAttachment(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-hidden">
           {previewAttachment && (
             <>
               {/* Header */}
@@ -1355,21 +1355,22 @@ export function TaskDetailSidebar({
                 )}
 
                 {previewAttachment.mimeType.startsWith('image/') && (
-                  <div className="flex items-center justify-center p-4 min-h-[400px]">
+                  <div className="flex items-center justify-center p-4 h-full">
                     <img
                       src={previewAttachment.url}
                       alt={previewAttachment.filename}
-                      className="max-w-full max-h-[70vh] object-contain rounded shadow-lg"
+                      className="max-w-full max-h-[calc(95vh-80px)] object-contain rounded shadow-lg"
                     />
                   </div>
                 )}
 
                 {previewAttachment.mimeType.startsWith('video/') && (
-                  <div className="flex items-center justify-center p-4 min-h-[400px]">
+                  <div className="flex items-center justify-center p-4 h-full">
                     <video
                       src={previewAttachment.url}
                       controls
-                      className="max-w-full max-h-[70vh] rounded shadow-lg"
+                      autoPlay
+                      className="max-w-full max-h-[calc(95vh-80px)] rounded shadow-lg"
                     >
                       Your browser does not support the video tag.
                     </video>

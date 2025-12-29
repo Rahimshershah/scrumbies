@@ -35,6 +35,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface Project {
   id: string
@@ -76,6 +84,11 @@ export default function AdminUsersPage() {
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
   const [showInviteForm, setShowInviteForm] = useState(false)
+
+  // Password reset
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [resettingPassword, setResettingPassword] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -263,6 +276,41 @@ export default function AdminUsersPage() {
     } catch (err) {
       setError('Failed to delete user')
       console.error(err)
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!resetPasswordUser || !newPassword) return
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+
+    setResettingPassword(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: resetPasswordUser.id, newPassword }),
+      })
+
+      if (res.ok) {
+        setSuccess(`Password reset successfully for ${resetPasswordUser.name}`)
+        setResetPasswordUser(null)
+        setNewPassword('')
+        setTimeout(() => setSuccess(null), 3000)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to reset password')
+      }
+    } catch (err) {
+      setError('Failed to reset password')
+      console.error(err)
+    } finally {
+      setResettingPassword(false)
     }
   }
 
@@ -602,21 +650,41 @@ export default function AdminUsersPage() {
                       {formatDate(user.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDeleteUser(user.id, user.name)}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete user</TooltipContent>
-                      </Tooltip>
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => {
+                                setResetPasswordUser(user)
+                                setNewPassword('')
+                              }}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                              </svg>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Reset password</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteUser(user.id, user.name)}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete user</TooltipContent>
+                        </Tooltip>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -624,6 +692,47 @@ export default function AdminUsersPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Password Reset Dialog */}
+        <Dialog open={!!resetPasswordUser} onOpenChange={(open) => !open && setResetPasswordUser(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset Password</DialogTitle>
+              <DialogDescription>
+                Set a new password for {resetPasswordUser?.name} ({resetPasswordUser?.email})
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">New Password</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 characters)"
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResetPasswordUser(null)
+                  setNewPassword('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                disabled={resettingPassword || newPassword.length < 6}
+              >
+                {resettingPassword ? 'Resetting...' : 'Reset Password'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   )

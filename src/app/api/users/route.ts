@@ -91,35 +91,69 @@ export async function PATCH(request: NextRequest) {
     await requireAdmin()
 
     const body = await request.json()
-    const { userId, role } = body
+    const { userId, role, newPassword } = body
 
-    if (!userId || !role) {
+    if (!userId) {
       return NextResponse.json(
-        { error: 'userId and role are required' },
+        { error: 'userId is required' },
         { status: 400 }
       )
     }
 
-    if (!['ADMIN', 'MEMBER'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role' },
-        { status: 400 }
-      )
+    // Handle password reset
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        return NextResponse.json(
+          { error: 'Password must be at least 6 characters' },
+          { status: 400 }
+        )
+      }
+
+      const hashedPassword = await hash(newPassword, 12)
+
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      })
+
+      return NextResponse.json({ ...user, passwordReset: true })
     }
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: { role },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-      },
-    })
+    // Handle role change
+    if (role) {
+      if (!['ADMIN', 'MEMBER'].includes(role)) {
+        return NextResponse.json(
+          { error: 'Invalid role' },
+          { status: 400 }
+        )
+      }
 
-    return NextResponse.json(user)
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { role },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      })
+
+      return NextResponse.json(user)
+    }
+
+    return NextResponse.json(
+      { error: 'No update field provided (role or newPassword)' },
+      { status: 400 }
+    )
   } catch (error) {
     if ((error as Error).message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
