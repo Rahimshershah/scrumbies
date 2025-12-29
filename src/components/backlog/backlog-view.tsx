@@ -376,6 +376,9 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       }
 
       if (oldIndex !== newIndex) {
+        // Get the actual order value from the target position
+        const targetOrder = sortedTasks[newIndex]?.order ?? newIndex
+
         setSprints((prev) => {
           const sprintIdx = prev.findIndex((s) => s.id === sprint.id)
           const sprintSortedTasks = [...prev[sprintIdx].tasks].sort((a, b) => a.order - b.order)
@@ -386,21 +389,21 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
           newSprints[sprintIdx] = { ...newSprints[sprintIdx], tasks: newTasks }
           return newSprints
         })
-      }
 
-      // Persist to server
-      try {
-        await fetch('/api/tasks/reorder', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId: activeId,
-            targetSprintId: sprint.id,
-            newOrder: newIndex,
-          }),
-        })
-      } catch (error) {
-        console.error('Failed to reorder task:', error)
+        // Persist to server
+        try {
+          await fetch('/api/tasks/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: activeId,
+              targetSprintId: sprint.id,
+              newOrder: targetOrder,
+            }),
+          })
+        } catch (error) {
+          console.error('Failed to reorder task:', error)
+        }
       }
     } else if (isInBacklog) {
       // Sort backlog tasks by order for accurate position calculations
@@ -413,27 +416,30 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       }
 
       if (oldIndex !== newIndex) {
+        // Get the actual order value from the target position
+        const targetOrder = sortedBacklog[newIndex]?.order ?? newIndex
+
         setBacklogTasks((prev) => {
           const sortedPrev = [...prev].sort((a, b) => a.order - b.order)
           const movedTasks = arrayMove(sortedPrev, oldIndex, newIndex)
           // Update order field values to match new array positions
           return movedTasks.map((task, idx) => ({ ...task, order: idx }))
         })
-      }
 
-      // Persist to server
-      try {
-        await fetch('/api/tasks/reorder', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId: activeId,
-            targetSprintId: null,
-            newOrder: newIndex,
-          }),
-        })
-      } catch (error) {
-        console.error('Failed to reorder task:', error)
+        // Persist to server
+        try {
+          await fetch('/api/tasks/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: activeId,
+              targetSprintId: null,
+              newOrder: targetOrder,
+            }),
+          })
+        } catch (error) {
+          console.error('Failed to reorder task:', error)
+        }
       }
     }
 

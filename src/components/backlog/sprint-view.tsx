@@ -686,10 +686,13 @@ export function SprintView({
 
     // Persist the new order automatically
     try {
+      // Get the actual order value at the target position
+      const baseTargetOrder = filteredTasks[targetIndex]?.order ?? targetIndex
+
       // Move all selected tasks sequentially to avoid race conditions
       for (let idx = 0; idx < tasksToMove.length; idx++) {
         const task = tasksToMove[idx]
-        const newOrder = targetIndex + idx
+        const newOrder = baseTargetOrder + idx
         const response = await fetch('/api/tasks/reorder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -699,7 +702,7 @@ export function SprintView({
             newOrder: newOrder,
           }),
         })
-        
+
         if (!response.ok) {
           throw new Error(`Failed to move task ${task.id}`)
         }
