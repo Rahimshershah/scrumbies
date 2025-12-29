@@ -690,6 +690,7 @@ export function SprintView({
       const baseTargetOrder = filteredTasks[targetIndex]?.order ?? targetIndex
 
       // Move all selected tasks sequentially to avoid race conditions
+      let lastResult = null
       for (let idx = 0; idx < tasksToMove.length; idx++) {
         const task = tasksToMove[idx]
         const newOrder = baseTargetOrder + idx
@@ -706,8 +707,17 @@ export function SprintView({
         if (!response.ok) {
           throw new Error(`Failed to move task ${task.id}`)
         }
+        lastResult = await response.json()
       }
-      
+
+      // Update with actual tasks from database to keep order values in sync
+      if (lastResult?.targetTasks) {
+        setLocalSprint(prev => ({
+          ...prev,
+          tasks: lastResult.targetTasks,
+        }))
+      }
+
       // Clear selection after successful move
       setSelectedTaskIds(new Set())
       setLastSelectedIndex(null)

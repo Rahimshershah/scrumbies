@@ -81,7 +81,62 @@ export async function POST(request: NextRequest) {
       })
     })
 
-    return NextResponse.json({ success: true })
+    // Fetch all tasks in the target sprint with their updated order values
+    const updatedTasks = await prisma.task.findMany({
+      where: { sprintId: targetSprintId },
+      orderBy: { order: 'asc' },
+      include: {
+        assignee: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
+        epic: {
+          select: { id: true, name: true, color: true },
+        },
+        splitFrom: {
+          select: { id: true, title: true },
+        },
+        splitTasks: {
+          select: { id: true, title: true, status: true, createdAt: true },
+        },
+        _count: {
+          select: { comments: true },
+        },
+      },
+    })
+
+    // If source sprint is different, also fetch its tasks
+    let sourceTasks = null
+    if (sourceSprintId !== targetSprintId && sourceSprintId !== null) {
+      sourceTasks = await prisma.task.findMany({
+        where: { sprintId: sourceSprintId },
+        orderBy: { order: 'asc' },
+        include: {
+          assignee: {
+            select: { id: true, name: true, avatarUrl: true },
+          },
+          epic: {
+            select: { id: true, name: true, color: true },
+          },
+          splitFrom: {
+            select: { id: true, title: true },
+          },
+          splitTasks: {
+            select: { id: true, title: true, status: true, createdAt: true },
+          },
+          _count: {
+            select: { comments: true },
+          },
+        },
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      targetSprintId,
+      targetTasks: updatedTasks,
+      sourceSprintId,
+      sourceTasks,
+    })
   } catch (error) {
     if ((error as Error).message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
