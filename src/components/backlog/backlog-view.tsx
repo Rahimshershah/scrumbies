@@ -15,6 +15,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable'
 import { Sprint, Task, Epic } from '@/types'
 import { SprintSection } from './sprint-section'
+import { UATSprintSection } from './uat-sprint-section'
 import { BacklogSection } from './backlog-section'
 import { TaskDetailSidebar } from './task-detail-sidebar'
 import { CreateSprintModal } from './create-sprint-modal'
@@ -172,15 +173,21 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   }, [searchQuery, filterPriority, filterAssignee, filterStatus, filterEpic, matchesSearch])
 
   // Categorize sprints
+  const uatSprints = sprints.filter(s => s.status === 'UAT')
   const activeSprints = sprints.filter(s => s.status === 'ACTIVE')
   const plannedSprints = sprints.filter(s => s.status === 'PLANNED')
   const closedSprints = sprints.filter(s => s.status === 'COMPLETED')
 
-  // Non-closed sprints for drag-drop
-  const visibleSprints = [...activeSprints, ...plannedSprints]
+  // Non-closed sprints for drag-drop (UAT sprints are also visible)
+  const visibleSprints = [...uatSprints, ...activeSprints, ...plannedSprints]
   
   // Filter and sort tasks based on search query and filters
   // Sort by order field to ensure correct drag-drop calculations
+  const filteredUATSprints = uatSprints.map(sprint => ({
+    ...sprint,
+    tasks: [...sprint.tasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
+  })).filter(sprint => sprint.tasks.length > 0 || (!searchQuery.trim() && filterPriority === 'ALL' && filterAssignee === 'ALL' && filterStatus === 'ALL'))
+
   const filteredActiveSprints = activeSprints.map(sprint => ({
     ...sprint,
     tasks: [...sprint.tasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
@@ -192,11 +199,12 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   })).filter(sprint => sprint.tasks.length > 0 || (!searchQuery.trim() && filterPriority === 'ALL' && filterAssignee === 'ALL' && filterStatus === 'ALL'))
 
   const filteredBacklogTasks = [...backlogTasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
-  
+
   // Calculate total tasks (for display)
   const totalTasks = visibleSprints.reduce((sum, s) => sum + s.tasks.length, 0) + backlogTasks.length
-  const filteredTotalTasks = filteredActiveSprints.reduce((sum, s) => sum + s.tasks.length, 0) + 
-                             filteredPlannedSprints.reduce((sum, s) => sum + s.tasks.length, 0) + 
+  const filteredTotalTasks = filteredUATSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
+                             filteredActiveSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
+                             filteredPlannedSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
                              filteredBacklogTasks.length
 
   const sensors = useSensors(
@@ -983,6 +991,43 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
+            {/* UAT Sprints - at the top, collapsed by default */}
+            {filteredUATSprints.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    UAT Sprints
+                  </h2>
+                  <Badge variant="default" className="bg-blue-500">
+                    {filteredUATSprints.length}
+                  </Badge>
+                </div>
+                {filteredUATSprints.map((sprint) => (
+                  <UATSprintSection
+                    key={sprint.id}
+                    sprint={sprint}
+                    users={users}
+                    epics={epics}
+                    allSprints={sprints}
+                    availableSprints={filteredPlannedSprints}
+                    projectId={projectId}
+                    onTaskClick={handleTaskClick}
+                    onCreateTask={handleCreateTask}
+                    onTaskUpdate={handleTaskUpdate}
+                    selectedTaskId={selectedTask?.id}
+                    onStatusChange={handleSprintStatusChange}
+                    onSprintUpdate={handleSprintUpdate}
+                    onSprintComplete={(completedSprint) => {
+                      setSprints(prev => prev.map(s =>
+                        s.id === completedSprint.id ? completedSprint : s
+                      ))
+                    }}
+                    onOpenInDedicatedView={setViewingSprint}
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Active Sprints */}
             {filteredActiveSprints.length > 0 && (
               <div className="mb-8">
@@ -1012,6 +1057,11 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     onSprintComplete={(completedSprint) => {
                       setSprints(prev => prev.map(s =>
                         s.id === completedSprint.id ? completedSprint : s
+                      ))
+                    }}
+                    onSprintUAT={(uatSprint) => {
+                      setSprints(prev => prev.map(s =>
+                        s.id === uatSprint.id ? uatSprint : s
                       ))
                     }}
                     onOpenInDedicatedView={setViewingSprint}
@@ -1080,8 +1130,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             )}
             
             {/* No Search Results */}
-            {(searchQuery.trim() || filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL') && 
-             filteredActiveSprints.length === 0 && filteredPlannedSprints.length === 0 && filteredBacklogTasks.length === 0 && (
+            {(searchQuery.trim() || filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL') &&
+             filteredUATSprints.length === 0 && filteredActiveSprints.length === 0 && filteredPlannedSprints.length === 0 && filteredBacklogTasks.length === 0 && (
               <div className="text-center py-12 border-2 border-dashed rounded-lg">
                 <p className="text-muted-foreground mb-2">
                   No tasks found matching your filters

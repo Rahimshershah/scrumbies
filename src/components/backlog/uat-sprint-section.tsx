@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Sprint, Task, Epic } from '@/types'
@@ -8,7 +8,6 @@ import { TaskCard } from './task-card'
 import { InlineTaskInput } from './inline-task-input'
 import { EditSprintModal } from './edit-sprint-modal'
 import { CompleteSprintModal } from './complete-sprint-modal'
-import { UATSprintModal } from './uat-sprint-modal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -20,12 +19,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-interface SprintSectionProps {
+interface UATSprintSectionProps {
   sprint: Sprint
   users: { id: string; name: string; avatarUrl?: string | null }[]
   epics?: Epic[]
-  allSprints?: Sprint[] // All sprints for task move dropdown
-  availableSprints?: Sprint[] // For complete modal - planned sprints
+  allSprints?: Sprint[]
+  availableSprints?: Sprint[]
   projectId?: string
   onTaskClick: (task: Task) => void
   onCreateTask: (task: Task) => void
@@ -33,9 +32,7 @@ interface SprintSectionProps {
   onStatusChange?: (sprintId: string, status: string) => void
   onSprintUpdate?: (sprint: Sprint) => void
   onSprintComplete?: (completedSprint: Sprint, newTasks?: Task[]) => void
-  onSprintUAT?: (uatSprint: Sprint, newTasks?: Task[]) => void
   onOpenInDedicatedView?: (sprint: Sprint) => void
-  variant?: 'active' | 'planned'
   selectedTaskId?: string | null
 }
 
@@ -45,7 +42,10 @@ function formatDate(dateString: string | null | undefined) {
   return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
 }
 
-export function SprintSection({
+// Local storage key for UAT sprint collapse state
+const getCollapseKey = (sprintId: string) => `uat-sprint-collapsed-${sprintId}`
+
+export function UATSprintSection({
   sprint,
   users,
   epics = [],
@@ -59,34 +59,42 @@ export function SprintSection({
   onStatusChange,
   onSprintUpdate,
   onSprintComplete,
-  onSprintUAT,
   onOpenInDedicatedView,
-  variant = 'planned'
-}: SprintSectionProps) {
+}: UATSprintSectionProps) {
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
-  const [showUATModal, setShowUATModal] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  // UAT sprints are collapsed by default
+  const [isCollapsed, setIsCollapsed] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+
+  // Load collapse state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(getCollapseKey(sprint.id))
+    if (saved !== null) {
+      setIsCollapsed(saved === 'true')
+    }
+  }, [sprint.id])
+
+  // Save collapse state to localStorage
+  const handleToggleCollapse = () => {
+    const newState = !isCollapsed
+    setIsCollapsed(newState)
+    localStorage.setItem(getCollapseKey(sprint.id), String(newState))
+  }
 
   const { setNodeRef, isOver } = useDroppable({
     id: sprint.id,
   })
 
-  // Sort tasks by order field to ensure correct drag-drop calculations
   const sortedTasks = [...sprint.tasks].sort((a, b) => a.order - b.order)
   const taskCount = sprint.tasks.length
   const taskIds = sortedTasks.map((t) => t.id)
   const openTasksCount = sprint.tasks.filter(t => t.status !== 'DONE' && t.status !== 'LIVE').length
-  // Count tasks that would be handled in UAT (TODO, IN_PROGRESS, BLOCKED)
-  const uatTasksToHandleCount = sprint.tasks.filter(t =>
-    t.status === 'TODO' || t.status === 'IN_PROGRESS' || t.status === 'BLOCKED'
-  ).length
 
-  // Count tasks with splits (tasks that have been split into others)
-  const splitTasksCount = sprint.tasks.filter(t => t.splitTasks && t.splitTasks.length > 0).length
-  // Count tasks that are split from others
-  const splitFromCount = sprint.tasks.filter(t => t.splitFrom).length
+  // Calculate task status summary for collapsed view
+  const testingCount = sprint.tasks.filter(t => t.status === 'READY_TO_TEST').length
+  const doneCount = sprint.tasks.filter(t => t.status === 'DONE').length
+  const liveCount = sprint.tasks.filter(t => t.status === 'LIVE').length
 
   async function handleStatusChange(newStatus: string) {
     try {
@@ -103,10 +111,8 @@ export function SprintSection({
 
   function handleCompleteClick() {
     if (openTasksCount > 0) {
-      // Show modal to choose what to do with open tasks
       setShowCompleteModal(true)
     } else {
-      // No open tasks, just complete
       handleStatusChange('COMPLETED')
     }
   }
@@ -114,21 +120,6 @@ export function SprintSection({
   function handleSprintCompleted(completedSprint: Sprint, action: string, targetSprintId?: string) {
     onSprintComplete?.(completedSprint)
     onStatusChange?.(sprint.id, 'COMPLETED')
-  }
-
-  function handleUATClick() {
-    if (uatTasksToHandleCount > 0) {
-      // Show modal to choose what to do with tasks to handle
-      setShowUATModal(true)
-    } else {
-      // No tasks to handle, just move to UAT
-      handleStatusChange('UAT')
-    }
-  }
-
-  function handleSprintUAT(uatSprint: Sprint, action: string, targetSprintId?: string) {
-    onSprintUAT?.(uatSprint)
-    onStatusChange?.(sprint.id, 'UAT')
   }
 
   const handleCreateTask = (task: Task) => {
@@ -144,14 +135,16 @@ export function SprintSection({
   return (
     <div className="mb-3">
       {/* Sprint header */}
-      <div className={cn(
-        "flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-t-md border cursor-pointer bg-muted/50 min-w-0"
-      )}
-      onClick={() => setIsCollapsed(!isCollapsed)}
+      <div
+        className={cn(
+          "flex items-center gap-2 sm:gap-3 px-3 py-1.5 rounded-t-md border cursor-pointer min-w-0",
+          "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+        )}
+        onClick={handleToggleCollapse}
       >
         <svg
           className={cn(
-            "w-3.5 h-3.5 text-muted-foreground transition-transform flex-shrink-0",
+            "w-3.5 h-3.5 text-blue-600 dark:text-blue-400 transition-transform flex-shrink-0",
             isCollapsed && "-rotate-90"
           )}
           fill="none"
@@ -161,17 +154,14 @@ export function SprintSection({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
 
-        {/* Sprint name - truncates on small screens */}
         <h3 className="font-medium text-sm truncate min-w-0 max-w-[120px] sm:max-w-[200px] md:max-w-none">{sprint.name}</h3>
 
-        {/* Active badge */}
-        {variant === 'active' && (
-          <Badge className="bg-green-500 hover:bg-green-500 text-white text-[10px] h-5 px-2">
-            Active
-          </Badge>
-        )}
+        {/* UAT badge */}
+        <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-[10px] h-5 px-2">
+          UAT
+        </Badge>
 
-        {/* Date range - hidden on small screens */}
+        {/* Date range */}
         {(sprint.startDate || sprint.endDate) && (
           <span className="hidden sm:flex text-[11px] text-muted-foreground items-center gap-1 flex-shrink-0">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +171,7 @@ export function SprintSection({
           </span>
         )}
 
-        {/* Task count badge - always visible but compact on mobile */}
+        {/* Task count badge */}
         <Badge variant="outline" className="text-[10px] h-5 px-1.5 sm:px-2 gap-1 flex-shrink-0">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -190,23 +180,28 @@ export function SprintSection({
           <span className="sm:hidden">{taskCount}</span>
         </Badge>
 
-        {/* Split indicator - hidden on small screens */}
-        {(splitTasksCount > 0 || splitFromCount > 0) && (
-          <Badge variant="secondary" className="hidden md:flex text-[10px] h-5 px-2 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400 flex-shrink-0">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            {splitTasksCount > 0 && `${splitTasksCount} split`}
-            {splitTasksCount > 0 && splitFromCount > 0 && ' · '}
-            {splitFromCount > 0 && `${splitFromCount} cont.`}
-          </Badge>
+        {/* Summary stats (shown when collapsed) */}
+        {isCollapsed && taskCount > 0 && (
+          <span className="hidden md:flex text-[11px] text-muted-foreground items-center gap-1.5 flex-shrink-0">
+            {testingCount > 0 && (
+              <span className="text-amber-600 dark:text-amber-400">{testingCount} Testing</span>
+            )}
+            {testingCount > 0 && (doneCount > 0 || liveCount > 0) && <span>·</span>}
+            {doneCount > 0 && (
+              <span className="text-green-600 dark:text-green-400">{doneCount} Done</span>
+            )}
+            {doneCount > 0 && liveCount > 0 && <span>·</span>}
+            {liveCount > 0 && (
+              <span className="text-purple-600 dark:text-purple-400">{liveCount} Live</span>
+            )}
+          </span>
         )}
 
         <div className="ml-auto flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {/* Eye icon for dedicated view */}
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="h-6 w-6 p-0"
             onClick={() => onOpenInDedicatedView?.(sprint)}
             title="Open full view"
@@ -241,36 +236,17 @@ export function SprintSection({
                 Open Full View
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {sprint.status !== 'ACTIVE' && (
-                <DropdownMenuItem onClick={() => handleStatusChange('ACTIVE')}>
-                  Start Sprint
-                </DropdownMenuItem>
-              )}
-              {sprint.status === 'ACTIVE' && (
-                <>
-                  <DropdownMenuItem onClick={handleUATClick}>
-                    UAT Sprint
-                    {uatTasksToHandleCount > 0 && (
-                      <span className="ml-2 text-[10px] text-blue-600 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
-                        {uatTasksToHandleCount} to move
-                      </span>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleCompleteClick}>
-                    Complete Sprint
-                    {openTasksCount > 0 && (
-                      <span className="ml-2 text-[10px] text-amber-600 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded">
-                        {openTasksCount} open
-                      </span>
-                    )}
-                  </DropdownMenuItem>
-                </>
-              )}
-              {sprint.status !== 'PLANNED' && sprint.status !== 'COMPLETED' && (
-                <DropdownMenuItem onClick={() => handleStatusChange('PLANNED')}>
-                  Move to Planned
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem onClick={handleCompleteClick}>
+                Complete Sprint
+                {openTasksCount > 0 && (
+                  <span className="ml-2 text-[10px] text-amber-600 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded">
+                    {openTasksCount} open
+                  </span>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleStatusChange('ACTIVE')}>
+                Back to Active
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive">
                 Delete Sprint
@@ -297,7 +273,8 @@ export function SprintSection({
           ref={setNodeRef}
           className={cn(
             "border border-t-0 rounded-b-md transition-colors",
-            isOver ? "bg-accent" : "bg-card",
+            "border-blue-200 dark:border-blue-800",
+            isOver ? "bg-blue-50 dark:bg-blue-950/50" : "bg-card",
             sprint.tasks.length === 0 && !isAddingTask && "min-h-[40px]"
           )}
         >
@@ -316,7 +293,6 @@ export function SprintSection({
             ))}
           </SortableContext>
 
-          {/* Inline task creation */}
           {isAddingTask && (
             <div className="px-2 py-1.5">
               <InlineTaskInput
@@ -337,6 +313,28 @@ export function SprintSection({
         </div>
       )}
 
+      {/* Collapsed summary bar */}
+      {isCollapsed && taskCount > 0 && (
+        <div
+          className={cn(
+            "border border-t-0 rounded-b-md px-3 py-2",
+            "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20"
+          )}
+        >
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="md:hidden">
+              {testingCount > 0 && <span className="text-amber-600">{testingCount} Testing</span>}
+              {testingCount > 0 && (doneCount > 0 || liveCount > 0) && ' · '}
+              {doneCount > 0 && <span className="text-green-600">{doneCount} Done</span>}
+              {doneCount > 0 && liveCount > 0 && ' · '}
+              {liveCount > 0 && <span className="text-purple-600">{liveCount} Live</span>}
+            </span>
+            <span className="hidden md:block">Click to expand and view all {taskCount} tasks</span>
+            <span className="md:hidden">Click to expand</span>
+          </div>
+        </div>
+      )}
+
       {/* Edit Sprint Modal */}
       {isEditing && (
         <EditSprintModal
@@ -353,16 +351,6 @@ export function SprintSection({
           availableSprints={availableSprints}
           onClose={() => setShowCompleteModal(false)}
           onComplete={handleSprintCompleted}
-        />
-      )}
-
-      {/* UAT Sprint Modal */}
-      {showUATModal && (
-        <UATSprintModal
-          sprint={sprint}
-          availableSprints={availableSprints}
-          onClose={() => setShowUATModal(false)}
-          onUAT={handleSprintUAT}
         />
       )}
     </div>

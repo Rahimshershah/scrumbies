@@ -53,12 +53,13 @@ export async function PATCH(
     const { name, startDate, endDate, status, order } = body
 
     // Check if trying to reactivate a completed sprint - admin only
+    // COMPLETED → ACTIVE or COMPLETED → UAT requires admin
     if (status && status !== 'COMPLETED') {
       const existingSprint = await prisma.sprint.findUnique({
         where: { id },
         select: { status: true },
       })
-      
+
       if (existingSprint?.status === 'COMPLETED' && user.role !== 'ADMIN') {
         return NextResponse.json(
           { error: 'Only admins can reactivate completed sprints' },

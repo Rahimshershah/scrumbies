@@ -1,5 +1,5 @@
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'READY_TO_TEST' | 'BLOCKED' | 'DONE' | 'LIVE'
-export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED'
+export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'UAT' | 'COMPLETED'
 export type Role = 'ADMIN' | 'MEMBER'
 export type Team = string // Dynamic - references ProjectTeam.key
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'

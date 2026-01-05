@@ -15,6 +15,7 @@ enum Role {
 enum SprintStatus {
   PLANNED
   ACTIVE
+  UAT
   COMPLETED
 }
 
