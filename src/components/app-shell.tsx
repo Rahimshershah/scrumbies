@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Header } from '@/components/header'
 import { BacklogView } from '@/components/backlog/backlog-view'
 import { SpacesView } from '@/components/spaces'
@@ -50,24 +50,45 @@ export function AppShell({
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
   const [epics, setEpics] = useState<Epic[]>(initialEpics)
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [loading, setLoading] = useState(false)
   const [currentView, setCurrentView] = useState<AppView>('backlog')
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null)
   const [taskToOpen, setTaskToOpen] = useState<string | null>(null)
 
-  // Restore view from localStorage on mount
+  // Restore view from URL query param or localStorage on mount
   useEffect(() => {
-    const savedView = localStorage.getItem('scrumbies_current_view') as AppView | null
-    if (savedView && (savedView === 'backlog' || savedView === 'epics' || savedView === 'reports' || savedView === 'spaces')) {
-      setCurrentView(savedView)
+    const viewParam = searchParams?.get('view') as AppView | null
+    if (viewParam && ['backlog', 'epics', 'reports', 'spaces'].includes(viewParam)) {
+      setCurrentView(viewParam)
+      localStorage.setItem('scrumbies_current_view', viewParam)
+    } else {
+      const savedView = localStorage.getItem('scrumbies_current_view') as AppView | null
+      if (savedView && ['backlog', 'epics', 'reports', 'spaces'].includes(savedView)) {
+        setCurrentView(savedView)
+        // Update URL to reflect saved view
+        const newParams = new URLSearchParams(searchParams?.toString() || '')
+        newParams.set('view', savedView)
+        router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
+      } else {
+        // Default view, update URL
+        const newParams = new URLSearchParams(searchParams?.toString() || '')
+        newParams.set('view', 'backlog')
+        router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
+      }
     }
-  }, [])
+  }, []) // Only run on mount
 
-  // Persist view changes to localStorage
+  // Persist view changes to localStorage and URL
   const handleViewChange = useCallback((view: AppView) => {
     setCurrentView(view)
     localStorage.setItem('scrumbies_current_view', view)
-  }, [])
+    // Update URL
+    const newParams = new URLSearchParams(searchParams?.toString() || '')
+    newParams.set('view', view)
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
+  }, [searchParams, router, pathname])
 
   // Check for task query parameter on mount
   useEffect(() => {
