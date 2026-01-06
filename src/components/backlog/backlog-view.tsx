@@ -113,10 +113,12 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   useEffect(() => {
     setSprints(initialSprints)
     setBacklogTasks(initialBacklog)
+    setEpics(initialEpics)
     setSelectedTask(null)
     setViewingSprint(null)
     setLastOpenedTaskId(null)
-  }, [projectId, initialSprints, initialBacklog])
+    setFilterEpic(null) // Reset epic filter when switching projects
+  }, [projectId, initialSprints, initialBacklog, initialEpics])
 
   // Search filter function
   const matchesSearch = useCallback((task: Task, query: string): boolean => {
