@@ -102,10 +102,11 @@ export function AppShell({
   const fetchProjectData = useCallback(async (projectId: string) => {
     setLoading(true)
     try {
-      const [sprintsRes, backlogRes, epicsRes] = await Promise.all([
+      const [sprintsRes, backlogRes, epicsRes, projectRes] = await Promise.all([
         fetch(`/api/sprints?projectId=${projectId}`),
         fetch(`/api/tasks?projectId=${projectId}&backlog=true`),
         fetch(`/api/epics?projectId=${projectId}`),
+        fetch(`/api/projects/${projectId}`),
       ])
 
       if (sprintsRes.ok && backlogRes.ok) {
@@ -114,10 +115,18 @@ export function AppShell({
         setSprints(sprintsData)
         setBacklogTasks(backlogData)
       }
-      
+
       if (epicsRes.ok) {
         const epicsData = await epicsRes.json()
         setEpics(epicsData)
+      }
+
+      // Update users with project members
+      if (projectRes.ok) {
+        const projectData = await projectRes.json()
+        if (projectData.members) {
+          setUsers(projectData.members)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch project data:', error)

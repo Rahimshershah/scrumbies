@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -160,13 +160,41 @@ export function EpicPanel({
 }: EpicPanelProps) {
   const [showModal, setShowModal] = useState(false)
   const [editingEpic, setEditingEpic] = useState<Epic | null>(null)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    // Default to collapsed if no epics
+    return epics.length === 0
+  })
   const [localEpics, setLocalEpics] = useState(epics)
 
-  // Sync local epics with props
-  if (JSON.stringify(epics.map(e => e.id)) !== JSON.stringify(localEpics.map(e => e.id))) {
-    setLocalEpics(epics)
+  // Local storage key for collapse state per project
+  const collapseKey = `epic-panel-collapsed-${projectId}`
+
+  // Load collapse preference from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(collapseKey)
+    if (saved !== null) {
+      setCollapsed(saved === 'true')
+    } else {
+      // If no saved preference, collapse if no epics
+      setCollapsed(epics.length === 0)
+    }
+  }, [collapseKey, epics.length])
+
+  // Handle collapse toggle with localStorage persistence
+  const handleCollapse = (newState: boolean) => {
+    setCollapsed(newState)
+    localStorage.setItem(collapseKey, String(newState))
   }
+
+  // Sync local epics with props and auto-collapse when switching to project with no epics
+  useEffect(() => {
+    setLocalEpics(epics)
+    // If switching to a project with no epics and no saved preference, collapse
+    const saved = localStorage.getItem(collapseKey)
+    if (saved === null && epics.length === 0) {
+      setCollapsed(true)
+    }
+  }, [epics, collapseKey])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -239,7 +267,7 @@ export function EpicPanel({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setCollapsed(false)}
+          onClick={() => handleCollapse(false)}
           title="Show Epics"
           className="h-6 w-6 mb-2"
         >
@@ -289,7 +317,7 @@ export function EpicPanel({
               variant="ghost"
               size="icon"
               className="h-6 w-6"
-              onClick={() => setCollapsed(true)}
+              onClick={() => handleCollapse(true)}
               title="Collapse"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

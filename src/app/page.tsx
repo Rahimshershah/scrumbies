@@ -95,14 +95,19 @@ export default async function Home() {
           },
         })
       : [],
-    prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        avatarUrl: true,
-      },
-      orderBy: { name: 'asc' },
-    }),
+    currentProjectId
+      ? prisma.user.findMany({
+          where: {
+            projects: { some: { id: currentProjectId } },
+          },
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          },
+          orderBy: { name: 'asc' },
+        })
+      : [],
     currentProjectId
       ? prisma.task.findMany({
           where: { 
