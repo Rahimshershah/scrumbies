@@ -6,12 +6,21 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface EpicTimelineProps {
   epics: Epic[]
@@ -19,16 +28,25 @@ interface EpicTimelineProps {
   onBack: () => void
   onTaskClick: (task: Task) => void
   onEpicClick: (epicId: string) => void
+  onEpicUpdated?: (epic: Epic) => void
+  onEpicDeleted?: (epicId: string) => void
+  projectId: string
 }
 
 interface EpicWithTasks extends Epic {
   tasks: Task[]
 }
 
-export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick }: EpicTimelineProps) {
+export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick, onEpicUpdated, onEpicDeleted, projectId }: EpicTimelineProps) {
   const [loading, setLoading] = useState(true)
   const [epicsWithTasks, setEpicsWithTasks] = useState<EpicWithTasks[]>([])
-  const [view, setView] = useState<'timeline' | 'list'>('timeline')
+  const [view, setView] = useState<'timeline' | 'list' | 'settings'>('timeline')
+
+  // Settings view state
+  const [editingEpicId, setEditingEpicId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [deleteConfirmEpic, setDeleteConfirmEpic] = useState<Epic | null>(null)
+  const [saving, setSaving] = useState(false)
 
   // Resizable left panel
   const [leftPanelWidth, setLeftPanelWidth] = useState(208) // w-52 = 208px
@@ -236,6 +254,76 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
     return now >= weekStart && now <= weekEnd
   }
 
+  // Handle epic rename
+  const handleSaveEpicName = async (epicId: string) => {
+    if (!editingName.trim()) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/epics/${epicId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingName.trim() }),
+      })
+
+      if (res.ok) {
+        const updatedEpic = await res.json()
+        setEpicsWithTasks(prev => prev.map(e =>
+          e.id === epicId ? { ...e, name: updatedEpic.name } : e
+        ))
+        onEpicUpdated?.(updatedEpic)
+        setEditingEpicId(null)
+        setEditingName('')
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to update epic')
+      }
+    } catch (error) {
+      console.error('Failed to update epic:', error)
+      alert('Failed to update epic')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Handle epic delete
+  const handleDeleteEpic = async () => {
+    if (!deleteConfirmEpic) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/epics/${deleteConfirmEpic.id}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setEpicsWithTasks(prev => prev.filter(e => e.id !== deleteConfirmEpic.id))
+        onEpicDeleted?.(deleteConfirmEpic.id)
+        setDeleteConfirmEpic(null)
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to delete epic')
+      }
+    } catch (error) {
+      console.error('Failed to delete epic:', error)
+      alert('Failed to delete epic')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Start editing an epic name
+  const startEditing = (epic: Epic) => {
+    setEditingEpicId(epic.id)
+    setEditingName(epic.name)
+  }
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setEditingEpicId(null)
+    setEditingName('')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -286,10 +374,22 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
             </svg>
             List
           </Button>
+          <Button
+            variant={view === 'settings' ? 'default' : 'ghost'}
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setView('settings')}
+          >
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Settings
+          </Button>
         </div>
       </div>
 
-      {view === 'timeline' ? (
+      {view === 'timeline' && (
         <ScrollArea className="flex-1">
           <div className="min-w-[900px]">
             {/* Week headers */}
@@ -563,8 +663,9 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
             )}
           </div>
         </ScrollArea>
-      ) : (
-        /* List view */
+      )}
+
+      {view === 'list' && (
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-4">
             {epicsWithTasks.map((epic) => {
@@ -685,6 +786,156 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick 
           </div>
         </ScrollArea>
       )}
+
+      {view === 'settings' && (
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold">Manage Epics</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Rename or delete epics. Deleting an epic will unlink its tasks but not delete them.
+                </p>
+              </div>
+
+              {epicsWithTasks.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                  <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <p className="text-muted-foreground">No epics to manage</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {epicsWithTasks.map((epic) => {
+                    const stats = getTaskStats(epic.tasks || [])
+                    const isEditing = editingEpicId === epic.id
+
+                    return (
+                      <div
+                        key={epic.id}
+                        className="border rounded-lg p-4 bg-background hover:bg-muted/30 transition-colors"
+                      >
+                        <div className="flex items-start gap-4">
+                          {/* Color indicator */}
+                          <div
+                            className="w-4 h-4 rounded-full flex-shrink-0 mt-1"
+                            style={{ backgroundColor: epic.color }}
+                          />
+
+                          {/* Main content */}
+                          <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  className="h-8"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveEpicName(epic.id)
+                                    } else if (e.key === 'Escape') {
+                                      cancelEditing()
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-8"
+                                  onClick={() => handleSaveEpicName(epic.id)}
+                                  disabled={saving || !editingName.trim()}
+                                >
+                                  {saving ? 'Saving...' : 'Save'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8"
+                                  onClick={cancelEditing}
+                                  disabled={saving}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <h3 className="font-medium">{epic.name}</h3>
+                                {epic.description && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                                    {epic.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                                  <span>{stats.total} tasks</span>
+                                  <span>•</span>
+                                  <span>{stats.done} done</span>
+                                  <span>•</span>
+                                  <span>{stats.progress}% complete</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          {!isEditing && (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={() => startEditing(epic)}
+                                title="Rename"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteConfirmEpic(epic)}
+                                title="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+      )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteConfirmEpic} onOpenChange={() => setDeleteConfirmEpic(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Epic</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deleteConfirmEpic?.name}</strong>?
+              <br /><br />
+              This will unlink all tasks from this epic, but the tasks will not be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmEpic(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteEpic} disabled={saving}>
+              {saving ? 'Deleting...' : 'Delete Epic'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -781,6 +781,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             <EpicTimeline
               epics={epics}
               sprints={sprints}
+              projectId={projectId}
               onBack={() => setViewingTimeline(false)}
               onTaskClick={(task) => {
                 // Stay in timeline, just open the detail sidebar
@@ -790,6 +791,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                 setViewingTimeline(false)
                 setFilterEpic(epicId)
               }}
+              onEpicUpdated={(epic) => setEpics(prev => prev.map(e => e.id === epic.id ? epic : e))}
+              onEpicDeleted={(epicId) => setEpics(prev => prev.filter(e => e.id !== epicId))}
             />
           </div>
         )}
