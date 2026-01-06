@@ -293,6 +293,7 @@ export function AppShell({
             taskToOpen={taskToOpen}
             onNavigateToReports={() => handleViewChange('reports')}
             onViewChange={handleViewChange}
+            currentView={currentView as 'backlog' | 'epics'}
           />
         ) : currentView === 'reports' ? (
           <AppLayout

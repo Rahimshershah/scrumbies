@@ -50,6 +50,7 @@ interface BacklogViewProps {
   taskToOpen?: string | null
   onNavigateToReports?: () => void
   onViewChange?: (view: 'backlog' | 'epics' | 'reports' | 'spaces') => void
+  currentView?: 'backlog' | 'epics'
 }
 
 interface PendingMove {
@@ -62,7 +63,7 @@ interface PendingMove {
   newOrder: number
 }
 
-export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports, onViewChange }: BacklogViewProps) {
+export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports, onViewChange, currentView = 'backlog' }: BacklogViewProps) {
   const { rowHeight, setRowHeight } = useRowHeight()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
@@ -71,7 +72,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showCreateSprint, setShowCreateSprint] = useState(false)
   const [viewingSprint, setViewingSprint] = useState<Sprint | null>(null)
-  const [viewingTimeline, setViewingTimeline] = useState(false)
+  const [viewingTimeline, setViewingTimeline] = useState(currentView === 'epics')
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
   const [lastOpenedTaskId, setLastOpenedTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -83,6 +84,11 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
+
+  // Sync viewingTimeline with parent's currentView
+  useEffect(() => {
+    setViewingTimeline(currentView === 'epics')
+  }, [currentView])
 
   // Handle external task selection request (e.g., from email link with ?task=)
   useEffect(() => {
