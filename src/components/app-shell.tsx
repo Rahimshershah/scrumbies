@@ -292,6 +292,7 @@ export function AppShell({
             onOpenDocument={handleOpenDocument}
             taskToOpen={taskToOpen}
             onNavigateToReports={() => handleViewChange('reports')}
+            onViewChange={handleViewChange}
           />
         ) : currentView === 'reports' ? (
           <AppLayout

@@ -49,6 +49,7 @@ interface BacklogViewProps {
   onOpenDocument?: (documentId: string) => void
   taskToOpen?: string | null
   onNavigateToReports?: () => void
+  onViewChange?: (view: 'backlog' | 'epics' | 'reports' | 'spaces') => void
 }
 
 interface PendingMove {
@@ -61,7 +62,7 @@ interface PendingMove {
   newOrder: number
 }
 
-export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports }: BacklogViewProps) {
+export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports, onViewChange }: BacklogViewProps) {
   const { rowHeight, setRowHeight } = useRowHeight()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
@@ -755,10 +756,15 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       onViewChange={(view) => {
         if (view === 'reports') {
           onNavigateToReports?.()
+          onViewChange?.('reports')
         } else if (view === 'epics') {
           setViewingTimeline(true)
-        } else {
+          onViewChange?.('epics')
+        } else if (view === 'backlog') {
           setViewingTimeline(false)
+          onViewChange?.('backlog')
+        } else {
+          onViewChange?.(view)
         }
       }}
     >
