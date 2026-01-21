@@ -91,7 +91,7 @@ export async function PATCH(request: NextRequest) {
     await requireAdmin()
 
     const body = await request.json()
-    const { userId, role, newPassword } = body
+    const { userId, role, newPassword, projectIds } = body
 
     if (!userId) {
       return NextResponse.json(
@@ -126,6 +126,42 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ...user, passwordReset: true })
     }
 
+    // Handle project assignment update
+    if (projectIds !== undefined) {
+      if (!Array.isArray(projectIds)) {
+        return NextResponse.json(
+          { error: 'projectIds must be an array' },
+          { status: 400 }
+        )
+      }
+
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          projects: {
+            set: projectIds.map((id: string) => ({ id })),
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+          projects: {
+            select: {
+              id: true,
+              name: true,
+              key: true,
+              logoUrl: true,
+            },
+          },
+        },
+      })
+
+      return NextResponse.json(user)
+    }
+
     // Handle role change
     if (role) {
       if (!['ADMIN', 'MEMBER'].includes(role)) {
@@ -151,7 +187,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'No update field provided (role or newPassword)' },
+      { error: 'No update field provided (role, newPassword, or projectIds)' },
       { status: 400 }
     )
   } catch (error) {

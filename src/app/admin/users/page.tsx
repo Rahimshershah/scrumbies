@@ -43,6 +43,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 interface Project {
   id: string
@@ -89,6 +94,11 @@ export default function AdminUsersPage() {
   const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [resettingPassword, setResettingPassword] = useState(false)
+
+  // Project management
+  const [editingUserProjects, setEditingUserProjects] = useState<string | null>(null)
+  const [userProjectSelections, setUserProjectSelections] = useState<Set<string>>(new Set())
+  const [savingProjects, setSavingProjects] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -311,6 +321,44 @@ export default function AdminUsersPage() {
       console.error(err)
     } finally {
       setResettingPassword(false)
+    }
+  }
+
+  function openProjectsEditor(user: User) {
+    const currentProjects = new Set(user.projects?.map(p => p.id) || [])
+    setUserProjectSelections(currentProjects)
+    setEditingUserProjects(user.id)
+  }
+
+  async function handleUpdateUserProjects(userId: string) {
+    setSavingProjects(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          projectIds: Array.from(userProjectSelections),
+        }),
+      })
+
+      if (res.ok) {
+        const updatedUser = await res.json()
+        setUsers(users.map(u => u.id === userId ? { ...u, projects: updatedUser.projects } : u))
+        setSuccess('Projects updated')
+        setEditingUserProjects(null)
+        setTimeout(() => setSuccess(null), 3000)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to update projects')
+      }
+    } catch (err) {
+      setError('Failed to update projects')
+      console.error(err)
+    } finally {
+      setSavingProjects(false)
     }
   }
 
@@ -595,42 +643,125 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{user.email}</TableCell>
                     <TableCell>
-                      {user.projects && Array.isArray(user.projects) && user.projects.length > 0 ? (
-                        <div className="flex -space-x-1">
-                          {user.projects.slice(0, 4).map((project) => (
-                            <Tooltip key={project.id}>
-                              <TooltipTrigger>
-                                {project.logoUrl ? (
-                                  <img
-                                    src={project.logoUrl}
-                                    alt={project.name || ''}
-                                    className="w-6 h-6 rounded border-2 border-white"
-                                  />
-                                ) : (
-                                  <div className="w-6 h-6 rounded border-2 border-white bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
-                                    {project.key?.slice(0, 2) || '??'}
+                      <Popover
+                        open={editingUserProjects === user.id}
+                        onOpenChange={(open) => {
+                          if (open) {
+                            openProjectsEditor(user)
+                          } else {
+                            setEditingUserProjects(null)
+                          }
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1 hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 transition-colors group">
+                            {user.projects && Array.isArray(user.projects) && user.projects.length > 0 ? (
+                              <div className="flex -space-x-1">
+                                {user.projects.slice(0, 4).map((project) => (
+                                  <Tooltip key={project.id}>
+                                    <TooltipTrigger>
+                                      {project.logoUrl ? (
+                                        <img
+                                          src={project.logoUrl}
+                                          alt={project.name || ''}
+                                          className="w-6 h-6 rounded border-2 border-white"
+                                        />
+                                      ) : (
+                                        <div className="w-6 h-6 rounded border-2 border-white bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                                          {project.key?.slice(0, 2) || '??'}
+                                        </div>
+                                      )}
+                                    </TooltipTrigger>
+                                    <TooltipContent>{project.name || 'Unknown'}</TooltipContent>
+                                  </Tooltip>
+                                ))}
+                                {user.projects.length > 4 && (
+                                  <div className="w-6 h-6 rounded border-2 border-white bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                                    +{user.projects.length - 4}
                                   </div>
                                 )}
-                              </TooltipTrigger>
-                              <TooltipContent>{project.name || 'Unknown'}</TooltipContent>
-                            </Tooltip>
-                          ))}
-                          {user.projects.length > 4 && (
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <div className="w-6 h-6 rounded border-2 border-white bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
-                                  +{user.projects.length - 4}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {user.projects.slice(4).map(p => p.name || 'Unknown').join(', ')}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No projects</span>
+                            )}
+                            <svg className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-3" align="start">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">Manage Projects</span>
+                              <div className="flex gap-2 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setUserProjectSelections(new Set(projects.map(p => p.id)))}
+                                  className="text-primary hover:underline"
+                                >
+                                  All
+                                </button>
+                                <span className="text-muted-foreground">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setUserProjectSelections(new Set())}
+                                  className="text-primary hover:underline"
+                                >
+                                  None
+                                </button>
+                              </div>
+                            </div>
+                            <div className="max-h-[200px] overflow-auto space-y-1">
+                              {projects && Array.isArray(projects) && projects.length > 0 ? (
+                                projects.map((project) => (
+                                  <label
+                                    key={project.id}
+                                    className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer"
+                                  >
+                                    <Checkbox
+                                      checked={userProjectSelections.has(project.id)}
+                                      onCheckedChange={(checked) => {
+                                        const next = new Set(userProjectSelections)
+                                        if (checked) next.add(project.id)
+                                        else next.delete(project.id)
+                                        setUserProjectSelections(next)
+                                      }}
+                                    />
+                                    <div className="flex items-center gap-1.5">
+                                      {project.logoUrl ? (
+                                        <img src={project.logoUrl} alt={project.name || ''} className="w-4 h-4 rounded" />
+                                      ) : (
+                                        <div className="w-4 h-4 rounded bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                                          {project.key?.slice(0, 2) || '??'}
+                                        </div>
+                                      )}
+                                      <span className="text-sm">{project.name || 'Unknown'}</span>
+                                    </div>
+                                  </label>
+                                ))
+                              ) : (
+                                <div className="text-xs text-muted-foreground p-2">No projects available</div>
+                              )}
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingUserProjects(null)}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateUserProjects(user.id)}
+                                disabled={savingProjects}
+                              >
+                                {savingProjects ? 'Saving...' : 'Save'}
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     <TableCell>
                       <Select
