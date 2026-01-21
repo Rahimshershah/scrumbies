@@ -67,14 +67,19 @@ export async function GET(
       }
     }
 
-    // Fetch all settings
+    // Fetch all settings - use new Team model with many-to-many
     const [statuses, teams] = await Promise.all([
       prisma.projectStatus.findMany({
         where: { projectId },
         orderBy: { order: 'asc' },
       }),
-      prisma.projectTeam.findMany({
-        where: { projectId },
+      // Get teams assigned to this project from the new Team model
+      prisma.team.findMany({
+        where: {
+          projects: {
+            some: { id: projectId },
+          },
+        },
         orderBy: { order: 'asc' },
       }),
     ])

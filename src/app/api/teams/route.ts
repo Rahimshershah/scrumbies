@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-utils'
 
-// GET - Fetch all teams with their project info (admin only)
+// GET - Fetch all global teams with their project assignments
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin()
+    await requireAuth()
 
-    const teams = await prisma.projectTeam.findMany({
+    const teams = await prisma.team.findMany({
       include: {
-        project: {
+        projects: {
           select: {
             id: true,
             name: true,
@@ -17,10 +17,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [
-        { project: { name: 'asc' } },
-        { order: 'asc' },
-      ],
+      orderBy: { order: 'asc' },
     })
 
     return NextResponse.json(teams)
@@ -28,28 +25,80 @@ export async function GET(request: NextRequest) {
     if ((error as Error).message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    if ((error as Error).message === 'Admin access required') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
-    }
     console.error('Failed to fetch teams:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
 
-// PATCH - Update a team's project assignment
+// POST - Create a new global team
+export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin()
+
+    const body = await request.json()
+    const { name, key, color, bgColor, projectIds } = body
+
+    if (!name || !key) {
+      return NextResponse.json({ error: 'Name and key are required' }, { status: 400 })
+    }
+
+    // Check if key already exists
+    const existing = await prisma.team.findUnique({
+      where: { key: key.toUpperCase() },
+    })
+
+    if (existing) {
+      return NextResponse.json({ error: `A team with key "${key}" already exists` }, { status: 400 })
+    }
+
+    const team = await prisma.team.create({
+      data: {
+        name,
+        key: key.toUpperCase(),
+        color: color || '#64748b',
+        bgColor: bgColor || '#f1f5f9',
+        projects: projectIds?.length > 0 ? {
+          connect: projectIds.map((id: string) => ({ id })),
+        } : undefined,
+      },
+      include: {
+        projects: {
+          select: {
+            id: true,
+            name: true,
+            key: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json(team)
+  } catch (error) {
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if ((error as Error).message === 'Admin access required') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+    console.error('Failed to create team:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+// PATCH - Update a team (name, color, or project assignments)
 export async function PATCH(request: NextRequest) {
   try {
     await requireAdmin()
 
     const body = await request.json()
-    const { teamId, projectId } = body
+    const { teamId, name, color, bgColor, projectIds } = body
 
-    if (!teamId || !projectId) {
-      return NextResponse.json({ error: 'teamId and projectId are required' }, { status: 400 })
+    if (!teamId) {
+      return NextResponse.json({ error: 'teamId is required' }, { status: 400 })
     }
 
     // Verify the team exists
-    const team = await prisma.projectTeam.findUnique({
+    const team = await prisma.team.findUnique({
       where: { id: teamId },
     })
 
@@ -57,36 +106,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 })
     }
 
-    // Verify the target project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-    })
+    // Build update data
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (color !== undefined) updateData.color = color
+    if (bgColor !== undefined) updateData.bgColor = bgColor
 
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    // Handle project assignments (replace all)
+    if (projectIds !== undefined) {
+      updateData.projects = {
+        set: projectIds.map((id: string) => ({ id })),
+      }
     }
 
-    // Check if a team with the same key already exists in the target project
-    const existingTeam = await prisma.projectTeam.findFirst({
-      where: {
-        projectId,
-        key: team.key,
-        id: { not: teamId },
-      },
-    })
-
-    if (existingTeam) {
-      return NextResponse.json({
-        error: `A team with key "${team.key}" already exists in ${project.name}`
-      }, { status: 400 })
-    }
-
-    // Update the team's project
-    const updatedTeam = await prisma.projectTeam.update({
+    const updatedTeam = await prisma.team.update({
       where: { id: teamId },
-      data: { projectId },
+      data: updateData,
       include: {
-        project: {
+        projects: {
           select: {
             id: true,
             name: true,
@@ -105,6 +142,44 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
     console.error('Failed to update team:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+// DELETE - Delete a team
+export async function DELETE(request: NextRequest) {
+  try {
+    await requireAdmin()
+
+    const { searchParams } = new URL(request.url)
+    const teamId = searchParams.get('teamId')
+
+    if (!teamId) {
+      return NextResponse.json({ error: 'teamId is required' }, { status: 400 })
+    }
+
+    // Verify the team exists
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+    })
+
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 404 })
+    }
+
+    await prisma.team.delete({
+      where: { id: teamId },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    if ((error as Error).message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if ((error as Error).message === 'Admin access required') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+    console.error('Failed to delete team:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

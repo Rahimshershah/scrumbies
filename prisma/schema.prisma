@@ -73,7 +73,8 @@ model Project {
   createdBy      User            @relation("CreatedProjects", fields: [createdById], references: [id])
   createdById    String
   customStatuses ProjectStatus[]
-  customTeams    ProjectTeam[]
+  customTeams    ProjectTeam[]   // Legacy - for backward compatibility
+  teams          Team[]          @relation("ProjectTeams") // New global teams
 }
 
 // Custom statuses per project
@@ -96,7 +97,23 @@ model ProjectStatus {
   @@index([projectId])
 }
 
-// Custom teams per project
+// Global teams that can be assigned to multiple projects
+model Team {
+  id        String    @id @default(cuid())
+  name      String    // Display name like "Operations"
+  key       String    @unique // Internal key like "OPS" - globally unique
+  color     String    @default("#64748b") // Hex color
+  bgColor   String    @default("#f1f5f9") // Background hex color
+  icon      String?   // Optional emoji or icon
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  // Many-to-many with projects
+  projects  Project[] @relation("ProjectTeams")
+}
+
+// Keep ProjectTeam for backward compatibility during migration
+// TODO: Remove after data migration
 model ProjectTeam {
   id        String  @id @default(cuid())
   name      String  // Display name like "Operations"
@@ -106,7 +123,7 @@ model ProjectTeam {
   icon      String? // Optional emoji or icon
   order     Int     @default(0)
   isDefault Boolean @default(false) // Is this a default team that can't be deleted
-  
+
   // Relations
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId String

@@ -57,12 +57,20 @@ interface TeamSetting {
   isDefault: boolean
 }
 
-interface TeamWithProject extends TeamSetting {
-  project: {
+// New global team with multi-project support
+interface GlobalTeam {
+  id: string
+  name: string
+  key: string
+  color: string
+  bgColor: string
+  icon?: string | null
+  order: number
+  projects: {
     id: string
     name: string
     key: string
-  }
+  }[]
 }
 
 const COLOR_PRESETS = [
@@ -80,7 +88,7 @@ export default function AdminSettingsPage() {
   const [projectId, setProjectId] = useState<string>('')
   const [statuses, setStatuses] = useState<StatusSetting[]>([])
   const [teams, setTeams] = useState<TeamSetting[]>([])
-  const [allTeams, setAllTeams] = useState<TeamWithProject[]>([])
+  const [globalTeams, setGlobalTeams] = useState<GlobalTeam[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +115,7 @@ export default function AdminSettingsPage() {
   const [newTeamKey, setNewTeamKey] = useState('')
   const [newTeamColor, setNewTeamColor] = useState('#475569')
   const [newTeamBgColor, setNewTeamBgColor] = useState('#f1f5f9')
-  const [newTeamProjectId, setNewTeamProjectId] = useState<string>('')
+  const [newTeamProjectIds, setNewTeamProjectIds] = useState<string[]>([])
 
   // New project form
   const [newProjectName, setNewProjectName] = useState('')
@@ -120,7 +128,6 @@ export default function AdminSettingsPage() {
     const stored = localStorage.getItem('currentProjectId')
     if (stored) {
       setProjectId(stored)
-      setNewTeamProjectId(stored)
     }
   }, [])
 
@@ -129,18 +136,18 @@ export default function AdminSettingsPage() {
       fetchSettings()
     }
     fetchProjects()
-    fetchAllTeams()
+    fetchGlobalTeams()
   }, [projectId])
 
-  async function fetchAllTeams() {
+  async function fetchGlobalTeams() {
     try {
       const res = await fetch('/api/teams')
       if (res.ok) {
         const data = await res.json()
-        setAllTeams(data)
+        setGlobalTeams(data)
       }
     } catch (err) {
-      console.error('Failed to fetch all teams:', err)
+      console.error('Failed to fetch global teams:', err)
     }
   }
 
@@ -467,12 +474,13 @@ export default function AdminSettingsPage() {
     }
   }
 
-  async function handleAddTeam() {
-    if (!newTeamName || !newTeamKey || !newTeamProjectId) return
+  // Create a new global team
+  async function handleCreateGlobalTeam() {
+    if (!newTeamName || !newTeamKey) return
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/projects/${newTeamProjectId}/settings/teams`, {
+      const res = await fetch('/api/teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -480,26 +488,22 @@ export default function AdminSettingsPage() {
           key: newTeamKey,
           color: newTeamColor,
           bgColor: newTeamBgColor,
+          projectIds: newTeamProjectIds,
         }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || 'Failed to add team')
+        throw new Error(data.error || 'Failed to create team')
       }
       const newTeam = await res.json()
-      // Only add to current list if it's for the current project
-      if (newTeamProjectId === projectId) {
-        setTeams([...teams, newTeam])
-      }
-      const targetProject = projects.find(p => p.id === newTeamProjectId)
+      setGlobalTeams(prev => [...prev, newTeam])
       setNewTeamName('')
       setNewTeamKey('')
       setNewTeamColor('#475569')
       setNewTeamBgColor('#f1f5f9')
-      setSuccess(`Team added to ${targetProject?.name || 'project'} successfully`)
+      setNewTeamProjectIds([])
+      setSuccess('Team created successfully')
       setTimeout(() => setSuccess(null), 3000)
-      // Refetch all teams to update the list
-      fetchAllTeams()
     } catch (err) {
       setError((err as Error).message)
       console.error(err)
@@ -508,31 +512,23 @@ export default function AdminSettingsPage() {
     }
   }
 
-  async function handleReassignTeam(teamId: string, newProjectId: string) {
+  // Update a team's project assignments
+  async function handleUpdateTeamProjects(teamId: string, projectIds: string[]) {
     setSaving(true)
     setError(null)
     try {
       const res = await fetch('/api/teams', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, projectId: newProjectId }),
+        body: JSON.stringify({ teamId, projectIds }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || 'Failed to reassign team')
+        throw new Error(data.error || 'Failed to update team')
       }
       const updatedTeam = await res.json()
-      // Update allTeams with the new data
-      setAllTeams(prev => prev.map(t => t.id === teamId ? updatedTeam : t))
-      // If team was moved to current project, add to local teams
-      if (newProjectId === projectId) {
-        setTeams(prev => [...prev, updatedTeam])
-      } else {
-        // If team was moved away from current project, remove from local teams
-        setTeams(prev => prev.filter(t => t.id !== teamId))
-      }
-      const targetProject = projects.find(p => p.id === newProjectId)
-      setSuccess(`Team moved to ${targetProject?.name || 'project'} successfully`)
+      setGlobalTeams(prev => prev.map(t => t.id === teamId ? updatedTeam : t))
+      setSuccess('Team updated successfully')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError((err as Error).message)
@@ -542,19 +538,20 @@ export default function AdminSettingsPage() {
     }
   }
 
-  async function handleDeleteTeam(teamId: string) {
-    if (!confirm('Delete this team?')) return
+  // Delete a global team
+  async function handleDeleteGlobalTeam(teamId: string) {
+    if (!confirm('Delete this team? This will remove it from all projects.')) return
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/projects/${projectId}/settings/teams?teamId=${teamId}`, {
+      const res = await fetch(`/api/teams?teamId=${teamId}`, {
         method: 'DELETE',
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Failed to delete team')
       }
-      setTeams(teams.filter(t => t.id !== teamId))
+      setGlobalTeams(prev => prev.filter(t => t.id !== teamId))
       setSuccess('Team deleted')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
@@ -569,8 +566,17 @@ export default function AdminSettingsPage() {
     setStatuses(statuses.map(s => s.id === id ? { ...s, [field]: value } : s))
   }
 
-  function updateTeam(id: string, field: keyof TeamSetting, value: any) {
-    setTeams(teams.map(t => t.id === id ? { ...t, [field]: value } : t))
+  // Toggle project assignment for a team
+  function toggleProjectForTeam(teamId: string, projectId: string) {
+    const team = globalTeams.find(t => t.id === teamId)
+    if (!team) return
+
+    const currentProjectIds = team.projects.map(p => p.id)
+    const newProjectIds = currentProjectIds.includes(projectId)
+      ? currentProjectIds.filter(id => id !== projectId)
+      : [...currentProjectIds, projectId]
+
+    handleUpdateTeamProjects(teamId, newProjectIds)
   }
 
   if (!projectId) {
@@ -971,173 +977,87 @@ export default function AdminSettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Teams Tab */}
+          {/* Teams Tab - Simple team management with multi-project assignment */}
           <TabsContent value="teams" className="space-y-6">
-            {/* All Teams by Project */}
             <Card>
               <CardHeader>
-                <CardTitle>All Teams by Project</CardTitle>
+                <CardTitle>Team Management</CardTitle>
                 <CardDescription>
-                  View and manage all teams across projects. Each team is assigned to a specific project.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {projects.map((project) => {
-                  const projectTeams = allTeams.filter(t => t.project.id === project.id)
-                  return (
-                    <div key={project.id} className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-sm">{project.name}</h4>
-                        <span className="text-xs text-muted-foreground">({project.key})</span>
-                        <span className="text-xs text-muted-foreground ml-auto">{projectTeams.length} team{projectTeams.length !== 1 ? 's' : ''}</span>
-                      </div>
-                      {projectTeams.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic pl-2">No teams assigned to this project</p>
-                      ) : (
-                        <div className="space-y-2 pl-2">
-                          {projectTeams.map((team) => (
-                            <div
-                              key={team.id}
-                              className="flex items-center gap-3 p-3 border rounded-lg bg-card"
-                            >
-                              <Badge
-                                style={{
-                                  backgroundColor: team.bgColor,
-                                  color: team.color,
-                                  borderColor: 'transparent',
-                                }}
-                                className="min-w-[60px] justify-center"
-                              >
-                                {team.key}
-                              </Badge>
-                              <span className="text-sm font-medium">{team.name}</span>
-                              {team.isDefault && (
-                                <span className="text-xs text-muted-foreground">(default)</span>
-                              )}
-                              <div className="ml-auto flex items-center gap-2">
-                                <Select
-                                  value={team.project.id}
-                                  onValueChange={(newProjectId) => handleReassignTeam(team.id, newProjectId)}
-                                >
-                                  <SelectTrigger className="w-40 h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {projects.map((p) => (
-                                      <SelectItem key={p.id} value={p.id}>
-                                        {p.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
-
-            {/* Current Project Teams (for editing) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Edit Teams for Current Project</CardTitle>
-                <CardDescription>
-                  Modify team names and colors for the currently selected project.
+                  Create teams and assign them to one or more projects. Teams can be shared across projects.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {teams.map((team) => (
-                    <div
-                      key={team.id}
-                      className="flex items-center gap-4 p-4 border rounded-lg bg-card"
-                    >
-                      {/* Color picker */}
-                      <div className="flex gap-1">
-                        {COLOR_PRESETS.map((preset, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            title={preset.label}
-                            className={cn(
-                              "w-6 h-6 rounded border-2 transition-all",
-                              team.color === preset.color ? "border-primary scale-110" : "border-transparent hover:scale-105"
-                            )}
-                            style={{ backgroundColor: preset.color }}
-                            onClick={() => {
-                              updateTeam(team.id, 'color', preset.color)
-                              updateTeam(team.id, 'bgColor', preset.bg)
-                            }}
-                          />
-                        ))}
-                      </div>
-
-                      {/* Preview badge */}
-                      <Badge
-                        style={{
-                          backgroundColor: team.bgColor,
-                          color: team.color,
-                          borderColor: 'transparent',
-                        }}
-                        className="min-w-[60px] justify-center"
+                {globalTeams.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No teams created yet. Create your first team below.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {globalTeams.map((team) => (
+                      <div
+                        key={team.id}
+                        className="flex items-center gap-4 p-4 border rounded-lg bg-card"
                       >
-                        {team.key}
-                      </Badge>
+                        {/* Team badge */}
+                        <Badge
+                          style={{
+                            backgroundColor: team.bgColor,
+                            color: team.color,
+                            borderColor: 'transparent',
+                          }}
+                          className="min-w-[70px] justify-center font-semibold"
+                        >
+                          {team.key}
+                        </Badge>
 
-                      {/* Name input */}
-                      <Input
-                        value={team.name}
-                        onChange={(e) => updateTeam(team.id, 'name', e.target.value)}
-                        className="w-40"
-                        placeholder="Full name"
-                      />
+                        {/* Team name */}
+                        <span className="text-sm font-medium w-32">{team.name}</span>
 
-                      {/* Key (readonly) */}
-                      <code className="text-xs bg-muted px-2 py-1.5 rounded font-mono">
-                        {team.key}
-                      </code>
+                        {/* Project checkboxes */}
+                        <div className="flex-1 flex flex-wrap gap-3">
+                          {projects.map((project) => {
+                            const isAssigned = team.projects.some(p => p.id === project.id)
+                            return (
+                              <label
+                                key={project.id}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isAssigned}
+                                  onCheckedChange={() => toggleProjectForTeam(team.id, project.id)}
+                                  disabled={saving}
+                                />
+                                <span className="text-sm">{project.name}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
 
-                      {/* Delete button */}
-                      <div className="ml-auto">
-                        {!team.isDefault ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDeleteTeam(team.id)}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground px-2">Default</span>
-                        )}
+                        {/* Delete button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => handleDeleteGlobalTeam(team.id)}
+                          disabled={saving}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </Button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Save Button */}
-                <div className="flex justify-end pt-2">
-                  <Button onClick={handleSaveTeams} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Add New Team */}
+            {/* Create New Team */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Add New Team</CardTitle>
+                <CardTitle className="text-base">Create New Team</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4 flex-wrap">
+                  {/* Color picker */}
                   <div className="flex gap-1">
                     {COLOR_PRESETS.map((preset, i) => (
                       <button
@@ -1157,6 +1077,7 @@ export default function AdminSettingsPage() {
                     ))}
                   </div>
 
+                  {/* Preview badge */}
                   <Badge
                     style={{
                       backgroundColor: newTeamBgColor,
@@ -1172,7 +1093,7 @@ export default function AdminSettingsPage() {
                     value={newTeamName}
                     onChange={(e) => setNewTeamName(e.target.value)}
                     className="w-40"
-                    placeholder="Full name"
+                    placeholder="Team name"
                   />
 
                   <Input
@@ -1182,21 +1103,28 @@ export default function AdminSettingsPage() {
                     placeholder="KEY"
                   />
 
-                  <Select value={newTeamProjectId} onValueChange={setNewTeamProjectId}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Project multi-select */}
+                  <div className="flex items-center gap-3 border rounded-md px-3 py-2">
+                    <span className="text-sm text-muted-foreground">Assign to:</span>
+                    {projects.map((project) => (
+                      <label key={project.id} className="flex items-center gap-1.5 cursor-pointer">
+                        <Checkbox
+                          checked={newTeamProjectIds.includes(project.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setNewTeamProjectIds(prev => [...prev, project.id])
+                            } else {
+                              setNewTeamProjectIds(prev => prev.filter(id => id !== project.id))
+                            }
+                          }}
+                        />
+                        <span className="text-sm">{project.name}</span>
+                      </label>
+                    ))}
+                  </div>
 
-                  <Button onClick={handleAddTeam} disabled={!newTeamName || !newTeamKey || !newTeamProjectId || saving}>
-                    Add Team
+                  <Button onClick={handleCreateGlobalTeam} disabled={!newTeamName || !newTeamKey || saving}>
+                    {saving ? 'Creating...' : 'Create Team'}
                   </Button>
                 </div>
               </CardContent>
