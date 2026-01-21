@@ -72,6 +72,9 @@ export function ProjectSettingsProvider({
       return
     }
 
+    // Clear existing data immediately to prevent showing stale data
+    setStatuses([])
+    setTeams([])
     setLoading(true)
     setError(null)
 

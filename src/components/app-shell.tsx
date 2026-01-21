@@ -255,7 +255,7 @@ export function AppShell({
   const effectiveProjectId = currentProjectId || projects[0]?.id
 
   return (
-    <ProjectSettingsProvider projectId={effectiveProjectId}>
+    <ProjectSettingsProvider key={effectiveProjectId} projectId={effectiveProjectId}>
       <RowHeightProvider>
         <div className="min-h-screen bg-background flex flex-col">
         <Header
