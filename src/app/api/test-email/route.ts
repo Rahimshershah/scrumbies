@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const emailPayload = {
       sender: {
         name: 'Scrumbies',
-        email: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
+        email: process.env.EMAIL_FROM || 'scrumbies@hesab.com',
       },
       to: [
         {

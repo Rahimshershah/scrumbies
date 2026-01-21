@@ -117,11 +117,30 @@ ssh -p 8899 sher@64.62.163.94 "cd /var/www/scrumbies && npx prisma migrate resol
 DATABASE_URL="postgresql://scrumbies:PASSWORD@localhost:5432/scrumbies?schema=public"
 NEXTAUTH_URL="https://scrumbies.hesab.com"
 NEXTAUTH_SECRET="generate-new-secret-with-openssl-rand-base64-32"
+
+# Email (Brevo)
+BREVO_API_KEY="your-brevo-api-key"
+EMAIL_FROM="scrumbies@hesab.com"
 ```
 
 ---
 
 ## Architecture Notes
+
+### Email Service
+- **Provider:** Brevo (formerly Sendinblue)
+- **Sender:** `scrumbies@hesab.com`
+- **Config:** `BREVO_API_KEY` and `EMAIL_FROM` in `.env`
+- **Implementation:** `src/lib/email.ts`
+- **Test Endpoint:** `POST /api/test-email` (admin only)
+
+**Email Types:**
+- Task assignment notifications
+- Comment notifications
+- @mention notifications
+- User invite emails
+- Weekly digest emails
+- Document comment notifications
 
 ### Image Storage
 - **User Avatars:** Stored as files in `/uploads/avatars/`, served via `/api/uploads/avatars/[filename]`

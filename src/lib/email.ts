@@ -3,7 +3,7 @@
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY || ''
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
-const FROM_EMAIL = process.env.EMAIL_FROM || 'noreply@scrumbies.hesab.com'
+const FROM_EMAIL = process.env.EMAIL_FROM || 'scrumbies@hesab.com'
 const FROM_NAME = process.env.EMAIL_FROM_NAME || 'Scrumbies'
 
 interface SendEmailOptions {
