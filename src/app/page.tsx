@@ -5,7 +5,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AppShell } from '@/components/app-shell'
 
-export default async function Home() {
+interface PageProps {
+  searchParams: Promise<{ projectId?: string; view?: string; task?: string }>
+}
+
+export default async function Home({ searchParams }: PageProps) {
+  const params = await searchParams
   const session = await getServerSession(authOptions)
 
   if (!session) {
@@ -46,8 +51,10 @@ export default async function Home() {
     orderBy: { createdAt: 'asc' },
   })
 
-  // Use the first project as default (client will handle localStorage preference)
-  const currentProjectId = projects[0]?.id || null
+  // Use project from query param if valid, otherwise first project (client will handle localStorage preference)
+  const requestedProjectId = params.projectId
+  const validProject = requestedProjectId && projects.some(p => p.id === requestedProjectId)
+  const currentProjectId = validProject ? requestedProjectId : (projects[0]?.id || null)
 
   // Fetch initial data for the default project
   const [sprints, users, backlogTasks, epics] = await Promise.all([

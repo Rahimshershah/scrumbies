@@ -76,6 +76,7 @@ export default function AdminSettingsPage() {
   const [editProjectName, setEditProjectName] = useState('')
   const [editProjectLogo, setEditProjectLogo] = useState<string | null>(null)
   const [savingProject, setSavingProject] = useState(false)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   // New status form
@@ -191,6 +192,41 @@ export default function AdminSettingsPage() {
     setEditingProject(null)
     setEditProjectName('')
     setEditProjectLogo(null)
+  }
+
+  async function handleDeleteProject(project: Project) {
+    if (!confirm(`Are you sure you want to delete "${project.name}"? This will permanently delete all tasks, sprints, epics, and other data associated with this project. This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingProjectId(project.id)
+    setError(null)
+
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setProjects(prev => prev.filter(p => p.id !== project.id))
+        setSuccess('Project deleted successfully')
+        setTimeout(() => setSuccess(null), 3000)
+
+        // If we deleted the current project, redirect to home
+        if (projectId === project.id) {
+          localStorage.removeItem('currentProjectId')
+          window.location.href = '/'
+        }
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to delete project')
+      }
+    } catch (err) {
+      setError('Failed to delete project')
+      console.error(err)
+    } finally {
+      setDeletingProjectId(null)
+    }
   }
 
   // Listen for project changes
@@ -529,16 +565,35 @@ export default function AdminSettingsPage() {
                                 )}
                               </p>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditProject(project)}
-                            >
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              Edit
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditProject(project)}
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDeleteProject(project)}
+                                disabled={deletingProjectId === project.id}
+                              >
+                                {deletingProjectId === project.id ? (
+                                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                )}
+                              </Button>
+                            </div>
                           </>
                         )}
                       </div>

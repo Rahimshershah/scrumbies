@@ -320,7 +320,17 @@ export function Header({ user, unreadCount, projects: initialProjects, currentPr
                 {projects.map((project) => (
                   <DropdownMenuItem
                     key={project.id}
-                    onClick={() => onProjectChange?.(project.id)}
+                    onClick={() => {
+                      if (currentProject?.id !== project.id) {
+                        // Store the project ID in localStorage and navigate with query param for server to read
+                        localStorage.setItem('scrumbies_current_project', project.id)
+                        localStorage.setItem('currentProjectId', project.id)
+                        // Use query param so server loads correct data
+                        const url = new URL(window.location.href)
+                        url.searchParams.set('projectId', project.id)
+                        window.location.href = url.toString()
+                      }
+                    }}
                     className="gap-2"
                   >
                     {project.logoUrl ? (
