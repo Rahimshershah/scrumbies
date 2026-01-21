@@ -18,6 +18,13 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 interface Project {
@@ -91,11 +98,20 @@ export default function AdminSettingsPage() {
   const [newTeamKey, setNewTeamKey] = useState('')
   const [newTeamColor, setNewTeamColor] = useState('#475569')
   const [newTeamBgColor, setNewTeamBgColor] = useState('#f1f5f9')
+  const [newTeamProjectId, setNewTeamProjectId] = useState<string>('')
+
+  // New project form
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectKey, setNewProjectKey] = useState('')
+  const [newProjectLogo, setNewProjectLogo] = useState<string | null>(null)
+  const [creatingProject, setCreatingProject] = useState(false)
+  const newProjectLogoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const stored = localStorage.getItem('currentProjectId')
     if (stored) {
       setProjectId(stored)
+      setNewTeamProjectId(stored)
     }
   }, [])
 
@@ -192,6 +208,68 @@ export default function AdminSettingsPage() {
     setEditingProject(null)
     setEditProjectName('')
     setEditProjectLogo(null)
+  }
+
+  function handleNewProjectLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file')
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Image too large. Please select an image under 2MB.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setNewProjectLogo(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+
+    if (newProjectLogoRef.current) {
+      newProjectLogoRef.current.value = ''
+    }
+  }
+
+  async function handleCreateProject() {
+    if (!newProjectName.trim() || !newProjectKey.trim()) return
+
+    setCreatingProject(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newProjectName.trim(),
+          key: newProjectKey.trim(),
+          logoUrl: newProjectLogo,
+        }),
+      })
+
+      if (res.ok) {
+        const project = await res.json()
+        setProjects(prev => [...prev, project])
+        setNewProjectName('')
+        setNewProjectKey('')
+        setNewProjectLogo(null)
+        setSuccess('Project created successfully')
+        setTimeout(() => setSuccess(null), 3000)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to create project')
+      }
+    } catch (err) {
+      setError('Failed to create project')
+      console.error(err)
+    } finally {
+      setCreatingProject(false)
+    }
   }
 
   async function handleDeleteProject(project: Project) {
@@ -368,11 +446,11 @@ export default function AdminSettingsPage() {
   }
 
   async function handleAddTeam() {
-    if (!newTeamName || !newTeamKey) return
+    if (!newTeamName || !newTeamKey || !newTeamProjectId) return
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/projects/${projectId}/settings/teams`, {
+      const res = await fetch(`/api/projects/${newTeamProjectId}/settings/teams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -387,12 +465,16 @@ export default function AdminSettingsPage() {
         throw new Error(data.error || 'Failed to add team')
       }
       const newTeam = await res.json()
-      setTeams([...teams, newTeam])
+      // Only add to current list if it's for the current project
+      if (newTeamProjectId === projectId) {
+        setTeams([...teams, newTeam])
+      }
+      const targetProject = projects.find(p => p.id === newTeamProjectId)
       setNewTeamName('')
       setNewTeamKey('')
       setNewTeamColor('#475569')
       setNewTeamBgColor('#f1f5f9')
-      setSuccess('Team added successfully')
+      setSuccess(`Team added to ${targetProject?.name || 'project'} successfully`)
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError((err as Error).message)
@@ -600,6 +682,65 @@ export default function AdminSettingsPage() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Create New Project */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Create New Project</CardTitle>
+                <CardDescription>
+                  Add a new project with its own tasks, sprints, teams, and statuses.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Logo Upload */}
+                  <div
+                    className="w-12 h-12 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden shrink-0"
+                    onClick={() => newProjectLogoRef.current?.click()}
+                  >
+                    {newProjectLogo ? (
+                      <img src={newProjectLogo} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg className="w-5 h-5 text-muted-foreground/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </div>
+                  <input
+                    ref={newProjectLogoRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleNewProjectLogoSelect}
+                  />
+
+                  <Input
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="w-48"
+                    placeholder="Project name"
+                  />
+
+                  <Input
+                    value={newProjectKey}
+                    onChange={(e) => setNewProjectKey(e.target.value.toUpperCase().slice(0, 5))}
+                    className="w-24 font-mono text-sm"
+                    placeholder="KEY"
+                    maxLength={5}
+                  />
+
+                  <Button
+                    onClick={handleCreateProject}
+                    disabled={!newProjectName.trim() || !newProjectKey.trim() || creatingProject}
+                  >
+                    {creatingProject ? 'Creating...' : 'Create Project'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Key must be 2-5 uppercase letters (e.g., HP, PROJ)
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -915,7 +1056,20 @@ export default function AdminSettingsPage() {
                     placeholder="KEY"
                   />
 
-                  <Button onClick={handleAddTeam} disabled={!newTeamName || !newTeamKey || saving}>
+                  <Select value={newTeamProjectId} onValueChange={setNewTeamProjectId}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button onClick={handleAddTeam} disabled={!newTeamName || !newTeamKey || !newTeamProjectId || saving}>
                     Add Team
                   </Button>
                 </div>
