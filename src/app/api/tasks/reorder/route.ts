@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { sprintId: true, order: true },
+      select: { sprintId: true, order: true, projectId: true },
     })
 
     if (!task) {
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
           await tx.task.updateMany({
             where: {
               sprintId: targetSprintId,
+              projectId: task.projectId,
               order: { gt: oldOrder, lte: newOrder },
             },
             data: { order: { decrement: 1 } },
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
           await tx.task.updateMany({
             where: {
               sprintId: targetSprintId,
+              projectId: task.projectId,
               order: { gte: newOrder, lt: oldOrder },
             },
             data: { order: { increment: 1 } },
@@ -56,6 +58,7 @@ export async function POST(request: NextRequest) {
         await tx.task.updateMany({
           where: {
             sprintId: sourceSprintId,
+            projectId: task.projectId,
             order: { gt: oldOrder },
           },
           data: { order: { decrement: 1 } },
@@ -65,6 +68,7 @@ export async function POST(request: NextRequest) {
         await tx.task.updateMany({
           where: {
             sprintId: targetSprintId,
+            projectId: task.projectId,
             order: { gte: newOrder },
           },
           data: { order: { increment: 1 } },
@@ -82,8 +86,9 @@ export async function POST(request: NextRequest) {
     })
 
     // Fetch all tasks in the target sprint with their updated order values
+    // IMPORTANT: Filter by projectId to prevent showing tasks from other projects
     const updatedTasks = await prisma.task.findMany({
-      where: { sprintId: targetSprintId },
+      where: { sprintId: targetSprintId, projectId: task.projectId },
       orderBy: { order: 'asc' },
       include: {
         assignee: {
@@ -108,7 +113,7 @@ export async function POST(request: NextRequest) {
     let sourceTasks = null
     if (sourceSprintId !== targetSprintId && sourceSprintId !== null) {
       sourceTasks = await prisma.task.findMany({
-        where: { sprintId: sourceSprintId },
+        where: { sprintId: sourceSprintId, projectId: task.projectId },
         orderBy: { order: 'asc' },
         include: {
           assignee: {

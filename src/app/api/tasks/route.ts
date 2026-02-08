@@ -76,8 +76,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Find max order for tasks in the same sprint or backlog
+    // IMPORTANT: Filter by projectId to avoid order conflicts across projects
     const maxOrderTask = await prisma.task.findFirst({
-      where: sprintId ? { sprintId } : { sprintId: null },
+      where: sprintId
+        ? { sprintId }
+        : { sprintId: null, projectId: projectId || undefined },
       orderBy: { order: 'desc' },
       select: { order: true },
     })

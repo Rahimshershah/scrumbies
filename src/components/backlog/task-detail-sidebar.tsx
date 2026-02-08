@@ -1094,7 +1094,7 @@ export function TaskDetailSidebar({
                                     </Button>
                                   )}
                                 </div>
-                                <div className="text-sm overflow-x-auto"><RichTextDisplay content={comment.content} /></div>
+                                <div className="text-sm overflow-hidden"><RichTextDisplay content={comment.content} /></div>
                               </div>
                             </div>
                           )
