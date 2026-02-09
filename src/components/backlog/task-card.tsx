@@ -178,18 +178,19 @@ export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, 
       data-task-card
       data-task-id={task.id}
       className={cn(
-        "relative flex items-center gap-2 sm:gap-3 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
+        "group relative flex items-center gap-2 sm:gap-3 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
         getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing",
         isActive && "bg-blue-50 dark:bg-blue-950/20",
         isSelected && "bg-primary/5 dark:bg-primary/10"
       )}
     >
-      {/* Checkbox for multi-select */}
+      {/* Checkbox for multi-select - visible on hover or when any task is selected */}
       <div
         className={cn(
           "flex-shrink-0 transition-all duration-150",
-          showCheckbox ? "w-5 opacity-100" : "w-0 opacity-0 overflow-hidden"
+          // Always show when any task is selected, otherwise show on hover via group-hover
+          showCheckbox ? "w-5 opacity-100" : "w-5 opacity-0 group-hover:opacity-100"
         )}
         onClick={(e) => e.stopPropagation()}
       >
