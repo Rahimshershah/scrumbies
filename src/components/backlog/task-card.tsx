@@ -32,9 +32,12 @@ interface TaskCardProps {
   onClick: () => void
   onUpdate?: (task: Task) => void
   isActive?: boolean
+  isSelected?: boolean
+  showCheckbox?: boolean
+  onSelectToggle?: (taskId: string, element: HTMLElement) => void
 }
 
-export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, onUpdate, isActive = false }: TaskCardProps) {
+export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, onUpdate, isActive = false, isSelected = false, showCheckbox = false, onSelectToggle }: TaskCardProps) {
   const { statuses, teams, getStatusConfig, getTeamConfig } = useProjectSettings()
   const { getRowHeightClass, getTextSize, getAvatarSize, getScale, getIconSize } = useRowHeight()
   const {
@@ -172,13 +175,46 @@ export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, 
       style={style}
       {...attributes}
       {...listeners}
+      data-task-card
+      data-task-id={task.id}
       className={cn(
         "relative flex items-center gap-2 sm:gap-3 px-3 bg-card border-b last:border-b-0 hover:bg-accent/50 transition-colors active:cursor-grabbing",
         getRowHeightClass(),
         isDragging && "opacity-50 shadow-lg bg-background cursor-grabbing",
-        isActive && "bg-blue-50 dark:bg-blue-950/20"
+        isActive && "bg-blue-50 dark:bg-blue-950/20",
+        isSelected && "bg-primary/5 dark:bg-primary/10"
       )}
     >
+      {/* Checkbox for multi-select */}
+      <div
+        className={cn(
+          "flex-shrink-0 transition-all duration-150",
+          showCheckbox ? "w-5 opacity-100" : "w-0 opacity-0 overflow-hidden"
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            e.preventDefault()
+            onSelectToggle?.(task.id, e.currentTarget.closest('[data-task-card]') as HTMLElement)
+          }}
+          className={cn(
+            "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors",
+            isSelected
+              ? "bg-primary border-primary text-primary-foreground"
+              : "border-muted-foreground/40 hover:border-primary/60"
+          )}
+        >
+          {isSelected && (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
+      </div>
+
       {/* Drag handle indicator */}
       <div
         className="text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0 pointer-events-none"

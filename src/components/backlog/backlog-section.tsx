@@ -19,6 +19,9 @@ interface BacklogSectionProps {
   onCreateTask: (task: Task) => void
   onTaskUpdate?: (task: Task) => void
   selectedTaskId?: string | null
+  // Multi-select props
+  selectedTaskIds?: Set<string>
+  onTaskSelectToggle?: (taskId: string, element: HTMLElement) => void
 }
 
 export function BacklogSection({
@@ -31,6 +34,8 @@ export function BacklogSection({
   onCreateTask,
   onTaskUpdate,
   selectedTaskId,
+  selectedTaskIds = new Set(),
+  onTaskSelectToggle,
 }: BacklogSectionProps) {
   const [isAddingTask, setIsAddingTask] = useState(false)
 
@@ -65,6 +70,9 @@ export function BacklogSection({
             onClick={() => onTaskClick(task)}
             onUpdate={onTaskUpdate}
             isActive={selectedTaskId === task.id}
+            isSelected={selectedTaskIds.has(task.id)}
+            showCheckbox={selectedTaskIds.size > 0}
+            onSelectToggle={onTaskSelectToggle}
           />
         ))}
       </SortableContext>

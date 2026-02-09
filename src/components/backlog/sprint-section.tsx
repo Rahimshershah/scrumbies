@@ -37,6 +37,9 @@ interface SprintSectionProps {
   onOpenInDedicatedView?: (sprint: Sprint) => void
   variant?: 'active' | 'planned'
   selectedTaskId?: string | null
+  // Multi-select props
+  selectedTaskIds?: Set<string>
+  onTaskSelectToggle?: (taskId: string, element: HTMLElement) => void
 }
 
 function formatDate(dateString: string | null | undefined) {
@@ -61,7 +64,9 @@ export function SprintSection({
   onSprintComplete,
   onSprintUAT,
   onOpenInDedicatedView,
-  variant = 'planned'
+  variant = 'planned',
+  selectedTaskIds = new Set(),
+  onTaskSelectToggle,
 }: SprintSectionProps) {
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
@@ -312,6 +317,9 @@ export function SprintSection({
                 onClick={() => onTaskClick(task)}
                 onUpdate={onTaskUpdate}
                 isActive={selectedTaskId === task.id}
+                isSelected={selectedTaskIds.has(task.id)}
+                showCheckbox={selectedTaskIds.size > 0}
+                onSelectToggle={onTaskSelectToggle}
               />
             ))}
           </SortableContext>

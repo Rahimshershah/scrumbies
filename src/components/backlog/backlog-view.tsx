@@ -19,7 +19,8 @@ import { UATSprintSection } from './uat-sprint-section'
 import { BacklogSection } from './backlog-section'
 import { TaskDetailSidebar } from './task-detail-sidebar'
 import { CreateSprintModal } from './create-sprint-modal'
-import { DailySummaryCard } from './daily-summary-card'
+import { BulkActionsToolbar } from './bulk-actions-toolbar'
+import { BulkMoveModal } from './bulk-move-modal'
 import { AppLayout } from '@/components/layout/app-layout'
 import { SprintView } from './sprint-view'
 import { EpicPanel } from './epic-panel'
@@ -82,7 +83,13 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
   const [filterEpic, setFilterEpic] = useState<string | null>(null) // null = all, 'none' = no epic, epicId = specific epic
   const [showEpicPanel, setShowEpicPanel] = useState(true) // Always show epic panel
-  
+
+  // Multi-select state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
+  const [lastSelectedElement, setLastSelectedElement] = useState<HTMLElement | null>(null)
+  const [showBulkMoveModal, setShowBulkMoveModal] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+
   // Track the original state before drag for reverting
   const originalStateRef = useRef<{ sprints: Sprint[]; backlog: Task[] } | null>(null)
 
@@ -751,6 +758,88 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
     }
   }
 
+  // Multi-select handlers
+  const handleTaskSelectToggle = useCallback((taskId: string, element: HTMLElement) => {
+    setSelectedTaskIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId)
+      } else {
+        newSet.add(taskId)
+      }
+      return newSet
+    })
+    setLastSelectedElement(element)
+  }, [])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedTaskIds(new Set())
+    setLastSelectedElement(null)
+  }, [])
+
+  const handleBulkMove = useCallback(async (targetSprintId: string | null) => {
+    const taskIds = Array.from(selectedTaskIds)
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds, sprintId: targetSprintId }),
+      })
+      if (res.ok) {
+        const { tasks: updatedTasks } = await res.json()
+
+        // Remove tasks from their current locations
+        setSprints(prev => prev.map(sprint => ({
+          ...sprint,
+          tasks: sprint.tasks.filter(t => !taskIds.includes(t.id))
+        })))
+        setBacklogTasks(prev => prev.filter(t => !taskIds.includes(t.id)))
+
+        // Add tasks to target location
+        if (targetSprintId) {
+          setSprints(prev => prev.map(sprint =>
+            sprint.id === targetSprintId
+              ? { ...sprint, tasks: [...sprint.tasks, ...updatedTasks] }
+              : sprint
+          ))
+        } else {
+          setBacklogTasks(prev => [...prev, ...updatedTasks])
+        }
+
+        handleClearSelection()
+      }
+    } catch (error) {
+      console.error('Failed to bulk move tasks:', error)
+    }
+  }, [selectedTaskIds, handleClearSelection])
+
+  const handleBulkDelete = useCallback(async () => {
+    const taskIds = Array.from(selectedTaskIds)
+    try {
+      const res = await fetch('/api/tasks/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds }),
+      })
+      if (res.ok) {
+        // Remove tasks from all locations
+        setSprints(prev => prev.map(sprint => ({
+          ...sprint,
+          tasks: sprint.tasks.filter(t => !taskIds.includes(t.id))
+        })))
+        setBacklogTasks(prev => prev.filter(t => !taskIds.includes(t.id)))
+
+        handleClearSelection()
+        setShowBulkDeleteConfirm(false)
+      }
+    } catch (error) {
+      console.error('Failed to bulk delete tasks:', error)
+    }
+  }, [selectedTaskIds, handleClearSelection])
+
+  // Whether any tasks are selected (to show checkboxes)
+  const hasSelection = selectedTaskIds.size > 0
+
   return (
     <AppLayout
       activeSprint={activeSprints[0] || null}
@@ -1002,9 +1091,6 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             </div>
           </div>
 
-          {/* AI Daily Summary */}
-          <DailySummaryCard projectId={projectId} />
-
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -1044,6 +1130,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                       ))
                     }}
                     onOpenInDedicatedView={setViewingSprint}
+                    selectedTaskIds={selectedTaskIds}
+                    onTaskSelectToggle={handleTaskSelectToggle}
                   />
                 ))}
               </div>
@@ -1087,6 +1175,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     }}
                     onOpenInDedicatedView={setViewingSprint}
                     variant="active"
+                    selectedTaskIds={selectedTaskIds}
+                    onTaskSelectToggle={handleTaskSelectToggle}
                   />
                 ))}
               </div>
@@ -1120,6 +1210,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     onSprintUpdate={handleSprintUpdate}
                     onOpenInDedicatedView={setViewingSprint}
                     variant="planned"
+                    selectedTaskIds={selectedTaskIds}
+                    onTaskSelectToggle={handleTaskSelectToggle}
                   />
                 ))}
               </div>
@@ -1146,6 +1238,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                   onCreateTask={handleCreateTask}
                   onTaskUpdate={handleTaskUpdate}
                   selectedTaskId={selectedTask?.id}
+                  selectedTaskIds={selectedTaskIds}
+                  onTaskSelectToggle={handleTaskSelectToggle}
                 />
               </div>
             )}
@@ -1283,6 +1377,44 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
           onCreate={handleCreateSprint}
         />
       )}
+
+      {/* Bulk actions toolbar */}
+      <BulkActionsToolbar
+        selectedCount={selectedTaskIds.size}
+        lastSelectedElement={lastSelectedElement}
+        onMove={() => setShowBulkMoveModal(true)}
+        onDelete={() => setShowBulkDeleteConfirm(true)}
+        onClearSelection={handleClearSelection}
+      />
+
+      {/* Bulk move modal */}
+      <BulkMoveModal
+        isOpen={showBulkMoveModal}
+        onClose={() => setShowBulkMoveModal(false)}
+        selectedCount={selectedTaskIds.size}
+        sprints={sprints}
+        onMove={handleBulkMove}
+      />
+
+      {/* Bulk delete confirmation */}
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''}?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. All selected tasks and their comments will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete}>
+              Delete {selectedTaskIds.size} task{selectedTaskIds.size !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }
