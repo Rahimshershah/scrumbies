@@ -40,12 +40,12 @@ export async function GET(
       },
       include: {
         user: { select: { name: true } },
-        task: { select: { title: true, taskKey: true } },
+        task: { select: { title: true, taskKey: true, description: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    // Fetch today's comments (not captured in Activity)
+    // Fetch today's comments with content
     const comments = await prisma.comment.findMany({
       where: {
         task: { projectId },
@@ -77,72 +77,91 @@ export async function GET(
       })
     }
 
-    // Build activity summary for the AI
+    // Helper to strip HTML tags from rich text content
+    const stripHtml = (html: string) => {
+      return html?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || ''
+    }
+
+    // Helper to truncate text
+    const truncate = (text: string, maxLen: number) => {
+      if (!text || text.length <= maxLen) return text
+      return text.slice(0, maxLen) + '...'
+    }
+
+    // Build detailed activity summary for the AI
     const activitySummary = {
       tasksCreated: activities.filter(a => a.type === 'CREATED').map(a => ({
-        task: a.task.taskKey || a.task.title,
+        key: a.task.taskKey,
+        title: a.task.title,
         by: a.user.name,
       })),
       statusChanges: activities.filter(a => a.type === 'STATUS_CHANGED').map(a => ({
-        task: a.task.taskKey || a.task.title,
+        key: a.task.taskKey,
+        title: a.task.title,
         by: a.user.name,
-        metadata: a.metadata,
+        from: (a.metadata as any)?.oldStatus,
+        to: (a.metadata as any)?.newStatus,
       })),
       priorityChanges: activities.filter(a => a.type === 'PRIORITY_CHANGED').map(a => ({
-        task: a.task.taskKey || a.task.title,
+        key: a.task.taskKey,
+        title: a.task.title,
         by: a.user.name,
-        metadata: a.metadata,
+        from: (a.metadata as any)?.oldPriority,
+        to: (a.metadata as any)?.newPriority,
       })),
       assignments: activities.filter(a => a.type === 'ASSIGNED').map(a => ({
-        task: a.task.taskKey || a.task.title,
+        key: a.task.taskKey,
+        title: a.task.title,
         by: a.user.name,
-        metadata: a.metadata,
+        assignedTo: (a.metadata as any)?.assigneeName,
       })),
       sprintMoves: activities.filter(a => a.type === 'MOVED_TO_SPRINT').map(a => ({
-        task: a.task.taskKey || a.task.title,
+        key: a.task.taskKey,
+        title: a.task.title,
         by: a.user.name,
-        metadata: a.metadata,
+        toSprint: (a.metadata as any)?.sprintName,
       })),
       splits: activities.filter(a => a.type === 'SPLIT').map(a => ({
-        task: a.task.taskKey || a.task.title,
+        key: a.task.taskKey,
+        title: a.task.title,
         by: a.user.name,
       })),
       comments: comments.map(c => ({
         task: c.task.taskKey || c.task.title,
         by: c.author.name,
+        content: truncate(stripHtml(c.content), 150),
       })),
       sprintUpdates: sprints.filter(s => s.createdAt >= today).map(s => ({
         name: s.name,
         status: s.status,
-        isNew: s.createdAt >= today,
       })),
     }
 
     // Generate AI summary
-    const prompt = `You are a project management assistant. Generate a brief, scannable daily summary of today's project activity.
+    const prompt = `You are an executive assistant summarizing today's project activity. Write a concise executive summary paragraph (2-4 sentences) that tells the story of what happened today.
 
 Project: ${project.name}
 
-Today's Activity Data:
+Today's Activity:
 ${JSON.stringify(activitySummary, null, 2)}
 
-Rules:
-- Use bullet points (•) for each item
-- Keep it concise - max 5-6 bullet points
-- Group similar activities (e.g., "5 tasks created by Sarah and Ahmed")
-- Mention specific people by first name
-- Highlight important changes (priority changes, sprint moves, UAT/completion)
-- If there are many comments, summarize them (e.g., "8 comments added across 3 tasks")
-- Start with a brief emoji that matches the tone (e.g., 📊 for normal day, 🚀 for busy day, 🔧 for bug fixes)
-- Don't include a header/title, just the bullet points
-- If nothing significant happened, say so briefly
+Guidelines:
+- Write in flowing paragraph form, NOT bullet points
+- Be specific: mention actual task names, what comments discussed, who did what
+- Summarize comment content briefly (e.g., "Sarah noted the payment flow needs testing")
+- Group related work (e.g., "The team focused on checkout improvements...")
+- Mention key people by first name
+- Highlight important status changes (things marked done, urgent, blocked)
+- Keep it to 2-4 sentences, like a daily standup update
+- Start with an emoji that fits the tone (📊 normal, 🚀 productive, 🔧 fixes, ⚠️ blockers)
+- Be conversational but professional
 
-Generate the summary now:`
+Write the executive summary now:`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 200,
+      max_tokens: 300,
       temperature: 0.7,
     })
 
