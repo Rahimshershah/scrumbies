@@ -19,6 +19,7 @@ import { UATSprintSection } from './uat-sprint-section'
 import { BacklogSection } from './backlog-section'
 import { TaskDetailSidebar } from './task-detail-sidebar'
 import { CreateSprintModal } from './create-sprint-modal'
+import { DailySummaryCard } from './daily-summary-card'
 import { AppLayout } from '@/components/layout/app-layout'
 import { SprintView } from './sprint-view'
 import { EpicPanel } from './epic-panel'
@@ -1000,6 +1001,9 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
               </div>
             </div>
           </div>
+
+          {/* AI Daily Summary */}
+          <DailySummaryCard projectId={projectId} />
 
           <DndContext
             sensors={sensors}
