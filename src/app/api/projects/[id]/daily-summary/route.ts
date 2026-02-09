@@ -52,8 +52,8 @@ export async function GET(
         createdAt: { gte: today },
       },
       include: {
-        author: { select: { name: true } },
-        task: { select: { title: true, taskKey: true } },
+        author: { select: { id: true, name: true } },
+        task: { select: { id: true, title: true, taskKey: true } },
       },
     })
 
@@ -77,91 +77,97 @@ export async function GET(
       })
     }
 
-    // Helper to strip HTML tags from rich text content
-    const stripHtml = (html: string) => {
-      return html?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || ''
-    }
+    // Get current user's name for personalization
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { name: true },
+    })
+    const userName = currentUser?.name || 'You'
+    const userFirstName = userName.split(' ')[0]
 
-    // Helper to truncate text
-    const truncate = (text: string, maxLen: number) => {
-      if (!text || text.length <= maxLen) return text
-      return text.slice(0, maxLen) + '...'
-    }
+    // Filter for activities relevant to this user:
+    // 1. Tasks assigned TO them
+    // 2. Comments that mention them
+    // 3. Activity on tasks they own
+    const myTaskIds = await prisma.task.findMany({
+      where: { projectId, assigneeId: user.id },
+      select: { id: true },
+    }).then(tasks => tasks.map(t => t.id))
 
-    // Build detailed activity summary for the AI
-    const activitySummary = {
-      tasksCreated: activities.filter(a => a.type === 'CREATED').map(a => ({
+    // Tasks assigned to me today
+    const assignedToMe = activities.filter(a =>
+      a.type === 'ASSIGNED' && (a.metadata as any)?.assigneeId === user.id
+    )
+
+    // Comments that mention me (check content for @mention)
+    const mentionedInComments = comments.filter(c =>
+      c.content?.toLowerCase().includes(`@${userName.toLowerCase()}`) ||
+      c.content?.toLowerCase().includes(`@${userFirstName.toLowerCase()}`)
+    )
+
+    // Activity on my tasks (tasks assigned to me)
+    const activityOnMyTasks = activities.filter(a => myTaskIds.includes(a.taskId))
+
+    // Comments on my tasks
+    const commentsOnMyTasks = comments.filter(c => myTaskIds.includes(c.taskId))
+
+    // Build personalized summary
+    const personalizedData = {
+      assignedToMe: assignedToMe.map(a => ({
+        task: a.task.title,
         key: a.task.taskKey,
-        title: a.task.title,
         by: a.user.name,
       })),
-      statusChanges: activities.filter(a => a.type === 'STATUS_CHANGED').map(a => ({
-        key: a.task.taskKey,
-        title: a.task.title,
-        by: a.user.name,
-        from: (a.metadata as any)?.oldStatus,
-        to: (a.metadata as any)?.newStatus,
-      })),
-      priorityChanges: activities.filter(a => a.type === 'PRIORITY_CHANGED').map(a => ({
-        key: a.task.taskKey,
-        title: a.task.title,
-        by: a.user.name,
-        from: (a.metadata as any)?.oldPriority,
-        to: (a.metadata as any)?.newPriority,
-      })),
-      assignments: activities.filter(a => a.type === 'ASSIGNED').map(a => ({
-        key: a.task.taskKey,
-        title: a.task.title,
-        by: a.user.name,
-        assignedTo: (a.metadata as any)?.assigneeName,
-      })),
-      sprintMoves: activities.filter(a => a.type === 'MOVED_TO_SPRINT').map(a => ({
-        key: a.task.taskKey,
-        title: a.task.title,
-        by: a.user.name,
-        toSprint: (a.metadata as any)?.sprintName,
-      })),
-      splits: activities.filter(a => a.type === 'SPLIT').map(a => ({
-        key: a.task.taskKey,
-        title: a.task.title,
-        by: a.user.name,
-      })),
-      comments: comments.map(c => ({
+      mentionedIn: mentionedInComments.map(c => ({
         task: c.task.taskKey || c.task.title,
         by: c.author.name,
-        content: truncate(stripHtml(c.content), 150),
       })),
-      sprintUpdates: sprints.filter(s => s.createdAt >= today).map(s => ({
-        name: s.name,
-        status: s.status,
+      myTasksUpdated: activityOnMyTasks.filter(a => a.userId !== user.id).map(a => ({
+        task: a.task.title,
+        key: a.task.taskKey,
+        type: a.type,
+        by: a.user.name,
       })),
+      commentsOnMyTasks: commentsOnMyTasks.filter(c => c.author.id !== user.id).map(c => ({
+        task: c.task.taskKey || c.task.title,
+        by: c.author.name,
+      })),
+    }
+
+    // Check if there's anything relevant for this user
+    const hasRelevantActivity =
+      personalizedData.assignedToMe.length > 0 ||
+      personalizedData.mentionedIn.length > 0 ||
+      personalizedData.myTasksUpdated.length > 0 ||
+      personalizedData.commentsOnMyTasks.length > 0
+
+    if (!hasRelevantActivity) {
+      return NextResponse.json({
+        summary: "Nothing new for you today. Your tasks are quiet!",
+        generated: false,
+      })
     }
 
     // Generate AI summary
-    const prompt = `You are an executive assistant summarizing today's project activity. Write a concise executive summary paragraph (2-4 sentences) that tells the story of what happened today.
+    const prompt = `You are a personal assistant giving a quick update. Summarize what happened today that's relevant to ${userFirstName}.
 
-Project: ${project.name}
+Data:
+${JSON.stringify(personalizedData, null, 2)}
 
-Today's Activity:
-${JSON.stringify(activitySummary, null, 2)}
+Rules:
+- Keep it SHORT - 1-2 sentences max
+- Be direct: "You were assigned...", "Sarah commented on your task...", "Your task was moved to..."
+- If multiple items, group them briefly
+- Use a friendly but concise tone
+- Start with a relevant emoji (📬 for assignments, 💬 for comments, 📋 for updates)
+- No fluff, just the key info
 
-Guidelines:
-- Write in flowing paragraph form, NOT bullet points
-- Be specific: mention actual task names, what comments discussed, who did what
-- Summarize comment content briefly (e.g., "Sarah noted the payment flow needs testing")
-- Group related work (e.g., "The team focused on checkout improvements...")
-- Mention key people by first name
-- Highlight important status changes (things marked done, urgent, blocked)
-- Keep it to 2-4 sentences, like a daily standup update
-- Start with an emoji that fits the tone (📊 normal, 🚀 productive, 🔧 fixes, ⚠️ blockers)
-- Be conversational but professional
-
-Write the executive summary now:`
+Write the personalized summary:`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300,
+      max_tokens: 150,
       temperature: 0.7,
     })
 

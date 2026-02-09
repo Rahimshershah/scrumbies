@@ -51,9 +51,9 @@ export function DailySummaryCard({ projectId }: DailySummaryCardProps) {
       <div className="border rounded-lg bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-950/20 dark:to-indigo-950/20 overflow-hidden">
         <CollapsibleTrigger className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/50 dark:hover:bg-white/5 transition-colors">
           <div className="flex items-center gap-2">
-            <span className="text-lg">✨</span>
-            <span className="font-medium text-sm">AI Daily Summary</span>
-            <span className="text-xs text-muted-foreground">Today's activity</span>
+            <span className="text-lg">📬</span>
+            <span className="font-medium text-sm">Your Daily Update</span>
+            <span className="text-xs text-muted-foreground">What's new for you</span>
           </div>
           <svg
             className={cn(
