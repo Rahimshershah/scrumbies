@@ -155,10 +155,11 @@ model User {
   createdEpics     Epic[]         @relation("CreatedEpics")
 
   // Spaces relations
-  createdDocuments  Document[]        @relation("CreatedDocuments")
-  documentVersions  DocumentVersion[] @relation("DocumentVersions")
-  documentComments  DocumentComment[] @relation("DocumentComments")
-  
+  createdDocuments    Document[]           @relation("CreatedDocuments")
+  documentVersions    DocumentVersion[]    @relation("DocumentVersions")
+  documentComments    DocumentComment[]    @relation("DocumentComments")
+  documentAttachments DocumentAttachment[] @relation("DocumentAttachments")
+
   // Invites sent by this user
   sentInvites       Invite[]          @relation("InviteSender")
 }
@@ -365,15 +366,33 @@ model Document {
   updatedAt DateTime @updatedAt
 
   // Relations
-  folder    Folder            @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  folderId  String
-  createdBy User              @relation("CreatedDocuments", fields: [createdById], references: [id])
+  folder      Folder               @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folderId    String
+  createdBy   User                 @relation("CreatedDocuments", fields: [createdById], references: [id])
   createdById String
-  versions  DocumentVersion[]
-  comments  DocumentComment[]
-  taskLinks TaskDocumentLink[]
+  versions    DocumentVersion[]
+  comments    DocumentComment[]
+  taskLinks   TaskDocumentLink[]
+  attachments DocumentAttachment[]
 
   @@index([folderId])
+}
+
+model DocumentAttachment {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  size      Int      // File size in bytes
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId   String
+  uploadedBy   User     @relation("DocumentAttachments", fields: [uploadedById], references: [id])
+  uploadedById String
+
+  @@index([documentId])
 }
 
 model DocumentVersion {

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DocumentComments } from './document-comments'
+import { DocumentAttachments } from './document-attachments'
 import type { Document } from './spaces-view'
 
 interface DocumentEditorProps {
@@ -300,6 +301,11 @@ export function DocumentEditor({ document, currentUser, onUpdate }: DocumentEdit
         <div className="flex-1 overflow-auto">
           {/* Toolbar - only show when editable */}
           {canEdit && <EditorToolbar editor={editor} />}
+          {/* Attachments */}
+          <DocumentAttachments
+            documentId={document.id}
+            canEdit={canEdit}
+          />
           {/* Editor Content */}
           <div className="p-6 max-w-4xl mx-auto">
             <EditorContent editor={editor} />
