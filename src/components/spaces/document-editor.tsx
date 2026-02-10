@@ -707,11 +707,17 @@ function FileDocumentViewer({
       {/* File Content */}
       <div className="flex-1 overflow-auto bg-muted/20">
         {isPDF ? (
-          <iframe
-            src={`${document.fileUrl}#view=FitH`}
-            className="w-full h-full border-0"
-            title={document.title}
-          />
+          <object
+            data={document.fileUrl}
+            type="application/pdf"
+            className="w-full h-full"
+          >
+            <embed
+              src={document.fileUrl}
+              type="application/pdf"
+              className="w-full h-full"
+            />
+          </object>
         ) : isImage ? (
           <div className="flex items-center justify-center p-8 h-full">
             <img
