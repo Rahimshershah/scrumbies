@@ -1,8 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { FolderTree } from './folder-tree'
 import { DocumentEditor } from './document-editor'
+import { ExplorerView } from './explorer-view'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -67,6 +78,17 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
   const [newFolderName, setNewFolderName] = useState('')
   const [creating, setCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<'explorer' | 'tree'>('explorer')
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+
+  // DnD sensors for folder reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  )
 
   // Fetch folders
   const fetchFolders = useCallback(async () => {
@@ -145,6 +167,27 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
     }
   }
 
+  // Create folder by name (for explorer view)
+  const handleCreateFolderByName = async (name: string) => {
+    try {
+      const res = await fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          projectId,
+        }),
+      })
+
+      if (res.ok) {
+        const folder = await res.json()
+        setFolders((prev) => [...prev, folder])
+      }
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+    }
+  }
+
   // Create document
   const handleCreateDocument = async (folderId: string) => {
     try {
@@ -175,8 +218,6 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
 
   // Delete folder
   const handleDeleteFolder = async (folderId: string) => {
-    if (!confirm('Are you sure you want to delete this folder and all its documents?')) return
-
     try {
       const res = await fetch(`/api/folders/${folderId}`, {
         method: 'DELETE',
@@ -187,10 +228,20 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
         if (selectedDocument?.folderId === folderId) {
           setSelectedDocumentId(null)
         }
+        // If we're viewing this folder in explorer mode, go back to root
+        if (currentFolderId === folderId) {
+          setCurrentFolderId(null)
+        }
       }
     } catch (error) {
       console.error('Failed to delete folder:', error)
     }
+  }
+
+  // Delete folder with confirmation (for tree view)
+  const handleDeleteFolderWithConfirm = async (folderId: string) => {
+    if (!confirm('Are you sure you want to delete this folder and all its documents?')) return
+    await handleDeleteFolder(folderId)
   }
 
   // Rename folder
@@ -212,10 +263,8 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
     }
   }
 
-  // Delete document
-  const handleDeleteDocument = async (documentId: string, folderId: string) => {
-    if (!confirm('Are you sure you want to delete this document?')) return
-
+  // Delete document (base function without confirmation)
+  const deleteDocument = async (documentId: string, folderId: string) => {
     try {
       const res = await fetch(`/api/documents/${documentId}`, {
         method: 'DELETE',
@@ -238,6 +287,12 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
     }
   }
 
+  // Delete document with confirmation (for tree view)
+  const handleDeleteDocument = async (documentId: string, folderId: string) => {
+    if (!confirm('Are you sure you want to delete this document?')) return
+    await deleteDocument(documentId, folderId)
+  }
+
   // Update document
   const handleDocumentUpdate = (updatedDoc: Document) => {
     setSelectedDocument(updatedDoc)
@@ -254,6 +309,37 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
       )
     )
   }
+
+  // Handle folder drag end for reordering
+  const handleFolderDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = folders.findIndex(f => f.id === active.id)
+    const newIndex = folders.findIndex(f => f.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // Optimistic update
+    const reorderedFolders = arrayMove(folders, oldIndex, newIndex)
+    setFolders(reorderedFolders)
+
+    // Persist to server
+    try {
+      await fetch('/api/folders/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderIds: reorderedFolders.map(f => f.id),
+          projectId,
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to reorder folders:', error)
+      // Revert on error
+      fetchFolders()
+    }
+  }, [folders, projectId, fetchFolders])
 
   // Filter folders based on search
   const filteredFolders = folders.map((folder) => ({
@@ -280,69 +366,128 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
 
   return (
     <div className="flex h-full">
-      {/* Sidebar */}
-      <div className="w-72 border-r bg-muted/30 flex flex-col">
-        {/* Sidebar Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Documents</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setShowCreateFolder(true)}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </Button>
-          </div>
-          {/* Search */}
-          <div className="relative">
-            <svg className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <Input
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
-        </div>
-
-        {/* Folder Tree */}
-        <div className="flex-1 overflow-auto p-2">
-          {filteredFolders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-              <p className="text-sm">No folders yet</p>
-              <p className="text-xs mt-1">Create a folder to get started</p>
+      {/* Sidebar - only show in tree mode or when document is selected */}
+      {(viewMode === 'tree' || selectedDocument) && (
+        <div className="w-72 border-r bg-muted/30 flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold">Documents</h2>
+              <div className="flex items-center gap-1">
+                {/* View Toggle */}
+                <div className="flex items-center border rounded-md p-0.5 mr-1">
+                  <Button
+                    variant={viewMode === 'explorer' ? 'default' : 'ghost'}
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                      setViewMode('explorer')
+                      if (!selectedDocument) {
+                        setCurrentFolderId(null)
+                      }
+                    }}
+                    title="Explorer view"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </Button>
+                  <Button
+                    variant={viewMode === 'tree' ? 'default' : 'ghost'}
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setViewMode('tree')}
+                    title="Tree view"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                    </svg>
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setShowCreateFolder(true)}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </Button>
+              </div>
             </div>
-          ) : (
-            <FolderTree
-              folders={filteredFolders}
-              selectedDocumentId={selectedDocumentId}
-              currentUser={currentUser}
-              onSelectDocument={setSelectedDocumentId}
-              onCreateDocument={handleCreateDocument}
-              onDeleteFolder={handleDeleteFolder}
-              onRenameFolder={handleRenameFolder}
-              onDeleteDocument={handleDeleteDocument}
-            />
-          )}
-        </div>
-      </div>
+            {/* Search */}
+            <div className="relative">
+              <svg className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <Input
+                placeholder="Search documents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+          </div>
 
-      {/* Editor */}
+          {/* Folder Tree */}
+          <div className="flex-1 overflow-auto p-2">
+            {filteredFolders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                <p className="text-sm">No folders yet</p>
+                <p className="text-xs mt-1">Create a folder to get started</p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleFolderDragEnd}
+              >
+                <SortableContext
+                  items={filteredFolders.map(f => f.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <FolderTree
+                    folders={filteredFolders}
+                    selectedDocumentId={selectedDocumentId}
+                    initialDocumentId={initialDocumentId}
+                    currentUser={currentUser}
+                    onSelectDocument={setSelectedDocumentId}
+                    onCreateDocument={handleCreateDocument}
+                    onDeleteFolder={handleDeleteFolderWithConfirm}
+                    onRenameFolder={handleRenameFolder}
+                    onDeleteDocument={handleDeleteDocument}
+                  />
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
         {selectedDocument ? (
           <DocumentEditor
             document={selectedDocument}
             currentUser={currentUser}
             onUpdate={handleDocumentUpdate}
+          />
+        ) : viewMode === 'explorer' ? (
+          <ExplorerView
+            folders={filteredFolders}
+            currentFolderId={currentFolderId}
+            currentUser={currentUser}
+            onNavigateToFolder={setCurrentFolderId}
+            onSelectDocument={setSelectedDocumentId}
+            onCreateFolder={handleCreateFolderByName}
+            onCreateDocument={handleCreateDocument}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onDeleteDocument={deleteDocument}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
