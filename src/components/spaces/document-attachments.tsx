@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { FileViewerPopup } from './file-viewer-popup'
 
 interface Attachment {
   id: string
@@ -27,6 +28,7 @@ export function DocumentAttachments({ documentId, canEdit }: DocumentAttachments
   const [uploading, setUploading] = useState(false)
   const [expanded, setExpanded] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
 
   // Fetch attachments
   useEffect(() => {
@@ -211,11 +213,9 @@ export function DocumentAttachments({ documentId, canEdit }: DocumentAttachments
                 className="group relative bg-background rounded-lg border overflow-hidden hover:border-primary/50 transition-colors"
               >
                 {/* Thumbnail or Icon */}
-                <a
-                  href={attachment.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block"
+                <button
+                  onClick={() => setViewingAttachment(attachment)}
+                  className="block w-full text-left"
                 >
                   {isImage(attachment.mimeType) ? (
                     <div className="aspect-square bg-muted flex items-center justify-center overflow-hidden">
@@ -244,7 +244,7 @@ export function DocumentAttachments({ documentId, canEdit }: DocumentAttachments
                       </div>
                     </div>
                   )}
-                </a>
+                </button>
 
                 {/* Info */}
                 <div className="p-2">
@@ -280,6 +280,17 @@ export function DocumentAttachments({ documentId, canEdit }: DocumentAttachments
           </div>
         )}
       </div>
+
+      {/* File Viewer Popup */}
+      {viewingAttachment && (
+        <FileViewerPopup
+          open={!!viewingAttachment}
+          onClose={() => setViewingAttachment(null)}
+          fileUrl={viewingAttachment.url}
+          filename={viewingAttachment.filename}
+          mimeType={viewingAttachment.mimeType}
+        />
+      )}
     </div>
   )
 }

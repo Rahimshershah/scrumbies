@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
@@ -11,6 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import type { Folder, Document } from './spaces-view'
 
@@ -25,6 +26,7 @@ interface FolderTreeProps {
   }
   onSelectDocument: (documentId: string) => void
   onCreateDocument: (folderId: string) => void
+  onUploadDocument: (folderId: string, file: File) => void
   onDeleteFolder: (folderId: string) => void
   onRenameFolder: (folderId: string, newName: string) => void
   onDeleteDocument: (documentId: string, folderId: string) => void
@@ -37,6 +39,7 @@ export function FolderTree({
   currentUser,
   onSelectDocument,
   onCreateDocument,
+  onUploadDocument,
   onDeleteFolder,
   onRenameFolder,
   onDeleteDocument,
@@ -103,6 +106,7 @@ export function FolderTree({
           }}
           onSelectDocument={onSelectDocument}
           onCreateDocument={() => onCreateDocument(folder.id)}
+          onUploadDocument={(file) => onUploadDocument(folder.id, file)}
           onDeleteFolder={() => onDeleteFolder(folder.id)}
           onDeleteDocument={(docId) => onDeleteDocument(docId, folder.id)}
         />
@@ -129,6 +133,7 @@ interface SortableFolderItemProps {
   onCancelEditing: () => void
   onSelectDocument: (documentId: string) => void
   onCreateDocument: () => void
+  onUploadDocument: (file: File) => void
   onDeleteFolder: () => void
   onDeleteDocument: (documentId: string) => void
 }
@@ -147,9 +152,11 @@ function SortableFolderItem({
   onCancelEditing,
   onSelectDocument,
   onCreateDocument,
+  onUploadDocument,
   onDeleteFolder,
   onDeleteDocument,
 }: SortableFolderItemProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const {
     attributes,
     listeners,
@@ -162,6 +169,17 @@ function SortableFolderItem({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      onUploadDocument(file)
+    }
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   return (
@@ -226,18 +244,46 @@ function SortableFolderItem({
         )}
 
         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={onCreateDocument}
-            title="Add document"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </Button>
+          {/* Hidden file input for upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            className="hidden"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
+          />
 
+          {/* Add new dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                title="Add document"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onCreateDocument}>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                New Document
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Upload File
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* More options dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -308,6 +354,42 @@ function DocumentItem({ document, isSelected, currentUser, onSelect, onDelete }:
   const isAdmin = currentUser.role === 'ADMIN'
   const canDelete = isOwner || isAdmin
 
+  // Get icon based on document type and mime type
+  const getDocumentIcon = () => {
+    if (document.type === 'file') {
+      const isPDF = document.mimeType === 'application/pdf'
+      const isImage = document.mimeType?.startsWith('image/')
+
+      if (isPDF) {
+        return (
+          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        )
+      }
+      if (isImage) {
+        return (
+          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        )
+      }
+      // Generic file icon
+      return (
+        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+        </svg>
+      )
+    }
+
+    // Default editor document icon
+    return (
+      <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -316,9 +398,7 @@ function DocumentItem({ document, isSelected, currentUser, onSelect, onDelete }:
       )}
       onClick={onSelect}
     >
-      <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
+      {getDocumentIcon()}
       <span className="flex-1 text-sm truncate">{document.title}</span>
 
       {canDelete && (

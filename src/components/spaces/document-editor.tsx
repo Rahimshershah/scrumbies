@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DocumentComments } from './document-comments'
 import { DocumentAttachments } from './document-attachments'
+import { FileViewerPopup } from './file-viewer-popup'
 import type { Document } from './spaces-view'
 
 interface DocumentEditorProps {
@@ -41,6 +42,9 @@ export function DocumentEditor({ document, currentUser, onUpdate }: DocumentEdit
   const contentRef = useRef<any>(document.content)
   const documentIdRef = useRef<string>(document.id)
   const isSettingContentRef = useRef<boolean>(false)
+
+  // Check if document is a file type
+  const isFileType = document.type === 'file'
 
   // Permission check: user can edit if they're the creator or an admin
   const isAdmin = currentUser.role === 'ADMIN'
@@ -297,19 +301,29 @@ export function DocumentEditor({ document, currentUser, onUpdate }: DocumentEdit
 
       {/* Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Editor */}
+        {/* Editor or File Viewer */}
         <div className="flex-1 overflow-auto">
-          {/* Toolbar - only show when editable */}
-          {canEdit && <EditorToolbar editor={editor} />}
-          {/* Attachments */}
-          <DocumentAttachments
-            documentId={document.id}
-            canEdit={canEdit}
-          />
-          {/* Editor Content */}
-          <div className="p-6 max-w-4xl mx-auto">
-            <EditorContent editor={editor} />
-          </div>
+          {isFileType ? (
+            /* File Viewer for uploaded files */
+            <FileDocumentViewer
+              document={document}
+              currentUser={currentUser}
+            />
+          ) : (
+            <>
+              {/* Toolbar - only show when editable */}
+              {canEdit && <EditorToolbar editor={editor} />}
+              {/* Attachments */}
+              <DocumentAttachments
+                documentId={document.id}
+                canEdit={canEdit}
+              />
+              {/* Editor Content */}
+              <div className="p-6 max-w-4xl mx-auto">
+                <EditorContent editor={editor} />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Side Panel - Comments only */}
@@ -563,4 +577,204 @@ function ToolbarButton({
 
 function ToolbarDivider() {
   return <div className="w-px h-6 bg-border mx-1" />
+}
+
+// File Document Viewer for file-type documents
+function FileDocumentViewer({
+  document,
+  currentUser,
+}: {
+  document: Document
+  currentUser: { id: string; name: string; role?: string }
+}) {
+  const [showFullscreen, setShowFullscreen] = useState(false)
+
+  if (!document.fileUrl) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        File not found
+      </div>
+    )
+  }
+
+  const isPDF = document.mimeType === 'application/pdf'
+  const isImage = document.mimeType?.startsWith('image/')
+  const isVideo = document.mimeType?.startsWith('video/')
+  const isAudio = document.mimeType?.startsWith('audio/')
+
+  const formatSize = (bytes: number | null | undefined) => {
+    if (!bytes) return 'Unknown size'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const handleDownload = () => {
+    const link = window.document.createElement('a')
+    link.href = document.fileUrl!
+    link.download = document.title
+    window.document.body.appendChild(link)
+    link.click()
+    window.document.body.removeChild(link)
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* File Info Bar */}
+      <div className="px-6 py-3 border-b bg-muted/30 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {isPDF && (
+            <div className="w-10 h-10 rounded bg-red-100 dark:bg-red-950/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
+          {isImage && (
+            <div className="w-10 h-10 rounded bg-green-100 dark:bg-green-950/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
+          {isVideo && (
+            <div className="w-10 h-10 rounded bg-purple-100 dark:bg-purple-950/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
+          {isAudio && (
+            <div className="w-10 h-10 rounded bg-blue-100 dark:bg-blue-950/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+          )}
+          {!isPDF && !isImage && !isVideo && !isAudio && (
+            <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+              <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+          )}
+          <div>
+            <p className="text-sm font-medium">{document.title}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatSize(document.fileSize)} • {document.mimeType}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+            className="gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(document.fileUrl!, '_blank')}
+            className="gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Open in Tab
+          </Button>
+          {(isPDF || isImage) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFullscreen(true)}
+              className="gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+              Fullscreen
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* File Content */}
+      <div className="flex-1 overflow-auto bg-muted/20">
+        {isPDF ? (
+          <iframe
+            src={`${document.fileUrl}#view=FitH`}
+            className="w-full h-full border-0"
+            title={document.title}
+          />
+        ) : isImage ? (
+          <div className="flex items-center justify-center p-8 h-full">
+            <img
+              src={document.fileUrl}
+              alt={document.title}
+              className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+            />
+          </div>
+        ) : isVideo ? (
+          <div className="flex items-center justify-center p-8 h-full">
+            <video
+              src={document.fileUrl}
+              controls
+              className="max-w-full max-h-full rounded-lg shadow-lg"
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        ) : isAudio ? (
+          <div className="flex flex-col items-center justify-center p-8 h-full gap-6">
+            <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center">
+              <svg className="w-16 h-16 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <audio
+              src={document.fileUrl}
+              controls
+              className="w-full max-w-md"
+            >
+              Your browser does not support the audio tag.
+            </audio>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-8 h-full text-center">
+            <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4">
+              <svg className="w-12 h-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <p className="text-muted-foreground mb-4">
+              This file type cannot be previewed in the browser.
+            </p>
+            <Button onClick={handleDownload}>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download File
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Fullscreen Popup */}
+      {showFullscreen && document.fileUrl && document.mimeType && (
+        <FileViewerPopup
+          open={showFullscreen}
+          onClose={() => setShowFullscreen(false)}
+          fileUrl={document.fileUrl}
+          filename={document.title}
+          mimeType={document.mimeType}
+        />
+      )}
+    </div>
+  )
 }

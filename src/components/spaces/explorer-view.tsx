@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,6 +10,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { FolderCard } from './folder-card'
 import { DocumentCard } from './document-card'
 import { ExplorerBreadcrumb } from './explorer-breadcrumb'
@@ -27,6 +33,7 @@ interface ExplorerViewProps {
   onSelectDocument: (documentId: string) => void
   onCreateFolder: (name: string) => void
   onCreateDocument: (folderId: string) => void
+  onUploadDocument: (folderId: string, file: File) => void
   onRenameFolder: (folderId: string, newName: string) => void
   onDeleteFolder: (folderId: string) => void
   onDeleteDocument: (documentId: string, folderId: string) => void
@@ -40,6 +47,7 @@ export function ExplorerView({
   onSelectDocument,
   onCreateFolder,
   onCreateDocument,
+  onUploadDocument,
   onRenameFolder,
   onDeleteFolder,
   onDeleteDocument,
@@ -48,6 +56,18 @@ export function ExplorerView({
   const [newFolderName, setNewFolderName] = useState('')
   const [renamingFolder, setRenamingFolder] = useState<Folder | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && currentFolder) {
+      onUploadDocument(currentFolder.id, file)
+    }
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const currentFolder = currentFolderId
     ? folders.find(f => f.id === currentFolderId) || null
@@ -113,21 +133,55 @@ export function ExplorerView({
               onNavigateToRoot={() => onNavigateToFolder(null)}
             />
           </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              if (currentFolder) {
-                onCreateDocument(currentFolder.id)
-              } else {
-                setShowCreateFolder(true)
-              }
-            }}
-          >
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {currentFolder ? 'New Document' : 'New Folder'}
-          </Button>
+          {currentFolder ? (
+            <>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm">
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    New
+                    <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onCreateDocument(currentFolder.id)}>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    New Document
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload File
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => setShowCreateFolder(true)}
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Folder
+            </Button>
+          )}
         </div>
       </div>
 

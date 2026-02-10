@@ -360,7 +360,11 @@ model Folder {
 model Document {
   id        String   @id @default(cuid())
   title     String
-  content   Json?    // TipTap JSON content
+  content   Json?    // TipTap JSON content (for editor type)
+  type      String   @default("editor") // "editor" or "file"
+  fileUrl   String?  // URL for uploaded files
+  fileSize  Int?     // File size in bytes
+  mimeType  String?  // MIME type for files
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

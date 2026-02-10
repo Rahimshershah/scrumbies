@@ -36,6 +36,10 @@ export interface Document {
   id: string
   title: string
   content: any
+  type: 'editor' | 'file'
+  fileUrl?: string | null
+  fileSize?: number | null
+  mimeType?: string | null
   order: number
   folderId: string
   createdById: string
@@ -212,6 +216,38 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
       }
     } catch (error) {
       console.error('Failed to create document:', error)
+    }
+  }
+
+  // Upload document as file
+  const handleUploadDocument = async (folderId: string, file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('folderId', folderId)
+
+      const res = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (res.ok) {
+        const document = await res.json()
+        setFolders((prev) =>
+          prev.map((f) =>
+            f.id === folderId
+              ? { ...f, documents: [...f.documents, document] }
+              : f
+          )
+        )
+        setSelectedDocumentId(document.id)
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to upload file')
+      }
+    } catch (error) {
+      console.error('Failed to upload document:', error)
+      alert('Failed to upload file')
     }
   }
 
@@ -424,6 +460,7 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
                   currentUser={currentUser}
                   onSelectDocument={setSelectedDocumentId}
                   onCreateDocument={handleCreateDocument}
+                  onUploadDocument={handleUploadDocument}
                   onDeleteFolder={handleDeleteFolderWithConfirm}
                   onRenameFolder={handleRenameFolder}
                   onDeleteDocument={handleDeleteDocument}
@@ -467,6 +504,7 @@ export function SpacesView({ projectId, currentUser, initialDocumentId, onDocume
             onSelectDocument={setSelectedDocumentId}
             onCreateFolder={handleCreateFolderByName}
             onCreateDocument={handleCreateDocument}
+            onUploadDocument={handleUploadDocument}
             onRenameFolder={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
             onDeleteDocument={deleteDocument}
