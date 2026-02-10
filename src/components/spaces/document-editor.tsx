@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { DocumentComments } from './document-comments'
 import { DocumentAttachments } from './document-attachments'
 import { FileViewerPopup } from './file-viewer-popup'
+import { PDFViewer } from './pdf-viewer'
 import type { Document } from './spaces-view'
 
 interface DocumentEditorProps {
@@ -707,17 +708,7 @@ function FileDocumentViewer({
       {/* File Content */}
       <div className="flex-1 overflow-auto bg-muted/20">
         {isPDF ? (
-          <object
-            data={document.fileUrl}
-            type="application/pdf"
-            className="w-full h-full"
-          >
-            <embed
-              src={document.fileUrl}
-              type="application/pdf"
-              className="w-full h-full"
-            />
-          </object>
+          <PDFViewer fileUrl={document.fileUrl} className="h-full" />
         ) : isImage ? (
           <div className="flex items-center justify-center p-8 h-full">
             <img
