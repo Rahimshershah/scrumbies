@@ -21,6 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface EpicTimelineProps {
   epics: Epic[]
@@ -504,30 +511,96 @@ export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTas
                       className="flex-shrink-0 px-2 py-1.5 border-r bg-muted/30 relative"
                       style={{ width: leftPanelWidth }}
                     >
-                      <button
-                        onClick={() => onEpicClick(epic.id)}
-                        className="text-left w-full"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: epic.color }}
+                      {editingEpicId === epic.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            className="h-7 text-sm"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveEpicName(epic.id)
+                              } else if (e.key === 'Escape') {
+                                cancelEditing()
+                              }
+                            }}
                           />
-                          <span className="font-medium text-sm truncate">{epic.name}</span>
+                          <Button
+                            size="sm"
+                            className="h-7 px-2"
+                            onClick={() => handleSaveEpicName(epic.id)}
+                            disabled={saving || !editingName.trim()}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            onClick={cancelEditing}
+                          >
+                            Cancel
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 ml-4">
-                          <span>{stats.total} tasks</span>
-                          <span>•</span>
-                          <span>{stats.progress}%</span>
-                          {/* Inline progress bar */}
-                          <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500 rounded-full"
-                              style={{ width: `${stats.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      </button>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="text-left w-full hover:bg-muted/50 rounded p-1 -m-1 transition-colors">
+                              <div className="flex items-center gap-1.5">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: epic.color }}
+                                />
+                                <span className="font-medium text-sm truncate">{epic.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 ml-4">
+                                <span>{stats.total} tasks</span>
+                                <span>•</span>
+                                <span>{stats.progress}%</span>
+                                {/* Inline progress bar */}
+                                <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-green-500 rounded-full"
+                                    style={{ width: `${stats.progress}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => onEpicClick(epic.id)}>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                              </svg>
+                              Filter by this Epic
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => startEditing(epic)}>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleArchive(epic)}>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
+                              Archive
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteConfirmEpic(epic)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
 
                     {/* Epic Timeline bar */}
@@ -739,32 +812,96 @@ export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTas
               return (
                 <div key={epic.id} className="border rounded-lg overflow-hidden">
                   {/* Epic header */}
-                  <div
-                    className="p-4 cursor-pointer hover:bg-muted/30"
-                    onClick={() => onEpicClick(epic.id)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: epic.color }}
+                  <div className="p-4">
+                    {editingEpicId === epic.id ? (
+                      <div className="flex items-center gap-2 mb-3">
+                        <Input
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          className="h-8"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveEpicName(epic.id)
+                            } else if (e.key === 'Escape') {
+                              cancelEditing()
+                            }
+                          }}
                         />
-                        <div>
-                          <h3 className="font-semibold">{epic.name}</h3>
-                          {epic.description && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {epic.description}
-                            </p>
-                          )}
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveEpicName(epic.id)}
+                          disabled={saving || !editingName.trim()}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={cancelEditing}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="flex items-center gap-3 text-left hover:bg-muted/50 rounded p-1 -m-1 transition-colors">
+                              <div
+                                className="w-4 h-4 rounded-full"
+                                style={{ backgroundColor: epic.color }}
+                              />
+                              <div>
+                                <h3 className="font-semibold">{epic.name}</h3>
+                                {epic.description && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                    {epic.description}
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => onEpicClick(epic.id)}>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                              </svg>
+                              Filter by this Epic
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => startEditing(epic)}>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleArchive(epic)}>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
+                              Archive
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteConfirmEpic(epic)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <div className="text-right text-sm">
+                          <div className="font-medium">{stats.progress}%</div>
+                          <div className="text-muted-foreground">
+                            {stats.done}/{stats.total} done
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right text-sm">
-                        <div className="font-medium">{stats.progress}%</div>
-                        <div className="text-muted-foreground">
-                          {stats.done}/{stats.total} done
-                        </div>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Progress bar */}
                     <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
