@@ -51,7 +51,21 @@ export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTas
   const [epicsWithTasks, setEpicsWithTasks] = useState<EpicWithTasks[]>([])
   const [archivedEpicsWithTasks, setArchivedEpicsWithTasks] = useState<EpicWithTasks[]>([])
   const [showArchived, setShowArchived] = useState(false)
+  const [expandedEpics, setExpandedEpics] = useState<Set<string>>(new Set())
   const [view, setView] = useState<'timeline' | 'list' | 'settings'>('timeline')
+
+  // Toggle epic expansion
+  const toggleEpicExpanded = useCallback((epicId: string) => {
+    setExpandedEpics(prev => {
+      const next = new Set(prev)
+      if (next.has(epicId)) {
+        next.delete(epicId)
+      } else {
+        next.add(epicId)
+      }
+      return next
+    })
+  }, [])
 
   // Settings view state
   const [editingEpicId, setEditingEpicId] = useState<string | null>(null)
@@ -459,6 +473,21 @@ export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTas
             Settings
           </Button>
         </div>
+
+        {/* Show Archived toggle */}
+        {archivedEpicsWithTasks.length > 0 && (
+          <Button
+            variant={showArchived ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-2 text-xs ml-2"
+            onClick={() => setShowArchived(!showArchived)}
+          >
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+            Archived ({archivedEpicsWithTasks.length})
+          </Button>
+        )}
       </div>
 
       {view === 'timeline' && (
@@ -921,14 +950,27 @@ export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTas
                     )}
                   </div>
 
-                  {/* Tasks */}
+                  {/* Tasks - Collapsible */}
                   {(epic.tasks || []).length > 0 && (
                     <div className="border-t bg-muted/20">
-                      <div className="p-3">
-                        <div className="text-xs font-medium text-muted-foreground mb-2">
+                      <button
+                        onClick={() => toggleEpicExpanded(epic.id)}
+                        className="w-full p-3 flex items-center gap-2 hover:bg-muted/30 transition-colors"
+                      >
+                        <svg
+                          className={`w-4 h-4 transition-transform ${expandedEpics.has(epic.id) ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="text-xs font-medium text-muted-foreground">
                           Tasks ({epic.tasks?.length})
-                        </div>
-                        <div className="space-y-1">
+                        </span>
+                      </button>
+                      {expandedEpics.has(epic.id) && (
+                        <div className="px-3 pb-3 space-y-1">
                           {(epic.tasks || []).slice(0, 5).map((task) => (
                             <button
                               key={task.id}
@@ -969,20 +1011,81 @@ export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTas
                             </button>
                           )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
               )
             })}
 
-            {epicsWithTasks.length === 0 && (
+            {epicsWithTasks.length === 0 && !showArchived && (
               <div className="text-center py-20 text-muted-foreground">
                 <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
                 <p className="text-lg font-medium">No epics yet</p>
                 <p className="text-sm mt-1">Create epics to organize your work</p>
+              </div>
+            )}
+
+            {/* Archived Epics */}
+            {showArchived && archivedEpicsWithTasks.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  Archived Epics
+                </h3>
+                {archivedEpicsWithTasks.map((epic) => {
+                  const stats = getTaskStats(epic.tasks || [])
+
+                  return (
+                    <div key={epic.id} className="border rounded-lg overflow-hidden mb-4 opacity-75">
+                      <div className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{ backgroundColor: epic.color }}
+                            />
+                            <div>
+                              <h3 className="font-semibold">{epic.name}</h3>
+                              {epic.description && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {epic.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleArchive(epic)}
+                              disabled={saving}
+                            >
+                              Unarchive
+                            </Button>
+                            <div className="text-right text-sm">
+                              <div className="font-medium">{stats.progress}%</div>
+                              <div className="text-muted-foreground">
+                                {stats.done}/{stats.total} done
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-green-500 rounded-full transition-all"
+                            style={{ width: `${stats.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

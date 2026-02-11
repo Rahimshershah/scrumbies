@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -178,8 +178,58 @@ export function EpicPanel({
   const [localEpics, setLocalEpics] = useState(epics)
   const [showArchived, setShowArchived] = useState(false)
 
+  // Resize state
+  const [panelWidth, setPanelWidth] = useState(220)
+  const isResizing = useRef(false)
+  const startX = useRef(0)
+  const startWidth = useRef(0)
+
   // Local storage key for collapse state per project
   const collapseKey = `epic-panel-collapsed-${projectId}`
+  const widthKey = `epic-panel-width-${projectId}`
+
+  // Load width from localStorage
+  useEffect(() => {
+    const savedWidth = localStorage.getItem(widthKey)
+    if (savedWidth) {
+      setPanelWidth(Math.max(180, Math.min(400, parseInt(savedWidth, 10))))
+    }
+  }, [widthKey])
+
+  // Resize handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    isResizing.current = true
+    startX.current = e.clientX
+    startWidth.current = panelWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [panelWidth])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return
+      const delta = e.clientX - startX.current
+      const newWidth = Math.max(180, Math.min(400, startWidth.current + delta))
+      setPanelWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      if (isResizing.current) {
+        isResizing.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        localStorage.setItem(widthKey, String(panelWidth))
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [panelWidth, widthKey])
 
   // Load collapse preference from localStorage on mount
   useEffect(() => {
@@ -323,7 +373,12 @@ export function EpicPanel({
 
   return (
     <>
-      <div className="border-r bg-muted/20 w-56 flex flex-col">
+      <div className="border-r bg-muted/20 flex flex-col relative" style={{ width: panelWidth }}>
+        {/* Resize handle */}
+        <div
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10"
+          onMouseDown={handleMouseDown}
+        />
         <div className="px-2 py-1.5 border-b flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <h3 className="font-semibold text-xs">Epics</h3>
