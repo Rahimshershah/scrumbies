@@ -64,7 +64,7 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
-    const { name, description, color, startDate, endDate, order } = body
+    const { name, description, color, startDate, endDate, order, isArchived } = body
 
     // Check if epic exists
     const existingEpic = await prisma.epic.findUnique({ where: { id } })
@@ -81,6 +81,7 @@ export async function PATCH(
         ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
         ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
         ...(order !== undefined && { order }),
+        ...(isArchived !== undefined && { isArchived }),
       },
       include: {
         createdBy: {

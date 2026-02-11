@@ -130,6 +130,7 @@ export interface Epic {
   startDate?: string | null
   endDate?: string | null
   order: number
+  isArchived?: boolean
   projectId: string
   createdById: string
   createdBy?: User

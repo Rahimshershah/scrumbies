@@ -31,11 +31,13 @@ import { cn } from '@/lib/utils'
 
 interface EpicPanelProps {
   epics: Epic[]
+  archivedEpics?: Epic[]
   selectedEpicId: string | null
   onSelectEpic: (epicId: string | null) => void
   onEpicCreated: (epic: Epic) => void
   onEpicUpdated: (epic: Epic) => void
   onEpicDeleted: (epicId: string) => void
+  onEpicArchived?: (epic: Epic) => void
   onViewTimeline: () => void
   projectId: string
   onEpicsReordered?: (epics: Epic[]) => void
@@ -47,9 +49,10 @@ interface SortableEpicItemProps {
   onSelect: () => void
   onEdit: () => void
   onDelete: () => void
+  onArchive: () => void
 }
 
-function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete }: SortableEpicItemProps) {
+function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete, onArchive }: SortableEpicItemProps) {
   const {
     attributes,
     listeners,
@@ -134,6 +137,12 @@ function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete }: Sort
               </svg>
               Edit
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onArchive}>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              {epic.isArchived ? 'Unarchive' : 'Archive'}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -149,11 +158,13 @@ function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete }: Sort
 
 export function EpicPanel({
   epics,
+  archivedEpics = [],
   selectedEpicId,
   onSelectEpic,
   onEpicCreated,
   onEpicUpdated,
   onEpicDeleted,
+  onEpicArchived,
   onViewTimeline,
   projectId,
   onEpicsReordered,
@@ -165,6 +176,7 @@ export function EpicPanel({
     return epics.length === 0
   })
   const [localEpics, setLocalEpics] = useState(epics)
+  const [showArchived, setShowArchived] = useState(false)
 
   // Local storage key for collapse state per project
   const collapseKey = `epic-panel-collapsed-${projectId}`
@@ -250,6 +262,33 @@ export function EpicPanel({
     }
   }
 
+  const handleArchive = async (epic: Epic) => {
+    const newArchivedState = !epic.isArchived
+    try {
+      const res = await fetch(`/api/epics/${epic.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: newArchivedState }),
+      })
+      if (res.ok) {
+        const updatedEpic = await res.json()
+        // Remove from local list if archiving
+        if (newArchivedState) {
+          setLocalEpics(prev => prev.filter(e => e.id !== epic.id))
+        }
+        onEpicArchived?.(updatedEpic)
+        if (selectedEpicId === epic.id && newArchivedState) {
+          onSelectEpic(null)
+        }
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to archive epic')
+      }
+    } catch (error) {
+      console.error('Failed to archive epic:', error)
+    }
+  }
+
   const handleSave = (epic: Epic) => {
     if (editingEpic) {
       onEpicUpdated(epic)
@@ -276,7 +315,7 @@ export function EpicPanel({
           </svg>
         </Button>
         <div className="writing-mode-vertical text-[10px] text-muted-foreground font-medium rotate-180" style={{ writingMode: 'vertical-rl' }}>
-          Epics ({localEpics.length})
+          Epics ({localEpics.length}{archivedEpics.length > 0 ? ` + ${archivedEpics.length} archived` : ''})
         </div>
       </div>
     )
@@ -375,12 +414,13 @@ export function EpicPanel({
                       setShowModal(true)
                     }}
                     onDelete={() => handleDelete(epic.id)}
+                    onArchive={() => handleArchive(epic)}
                   />
                 ))}
               </SortableContext>
             </DndContext>
 
-            {localEpics.length === 0 && (
+            {localEpics.length === 0 && archivedEpics.length === 0 && (
               <div className="text-center py-6 text-muted-foreground">
                 <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -394,6 +434,98 @@ export function EpicPanel({
                 >
                   Create your first epic
                 </Button>
+              </div>
+            )}
+
+            {/* Archived Epics Section */}
+            {archivedEpics.length > 0 && (
+              <div className="mt-2 pt-2 border-t">
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className="w-full text-left px-2 py-1 rounded text-xs transition-colors hover:bg-muted flex items-center gap-1.5 text-muted-foreground"
+                >
+                  <svg
+                    className={cn("w-3 h-3 transition-transform", showArchived && "rotate-90")}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  <span>Archived ({archivedEpics.length})</span>
+                </button>
+
+                {showArchived && (
+                  <div className="mt-1 space-y-0.5">
+                    {archivedEpics.map((epic) => (
+                      <div
+                        key={epic.id}
+                        className={cn(
+                          "rounded transition-colors opacity-60",
+                          selectedEpicId === epic.id
+                            ? 'bg-primary text-primary-foreground opacity-100'
+                            : 'hover:bg-muted'
+                        )}
+                      >
+                        <div className="flex items-center gap-1 px-1.5 py-1">
+                          {/* Main clickable area */}
+                          <button
+                            onClick={() => onSelectEpic(epic.id)}
+                            className="flex-1 min-w-0 text-left flex items-center gap-1.5 pl-4"
+                          >
+                            <div
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: epic.color }}
+                            />
+                            <span className="text-xs font-medium truncate">{epic.name}</span>
+                            {epic._count && (
+                              <span className={cn(
+                                "text-[10px] ml-auto",
+                                selectedEpicId === epic.id ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                              )}>
+                                {epic._count.tasks}
+                              </span>
+                            )}
+                          </button>
+
+                          {/* Unarchive button */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className={cn(
+                                  "flex-shrink-0 p-0.5 rounded",
+                                  selectedEpicId === epic.id ? 'hover:bg-primary-foreground/20 text-primary-foreground' : 'hover:bg-muted-foreground/20 text-muted-foreground'
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                </svg>
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleArchive(epic)}>
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                </svg>
+                                Unarchive
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDelete(epic.id)} className="text-destructive focus:text-destructive">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

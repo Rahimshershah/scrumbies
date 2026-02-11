@@ -9,13 +9,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
+    const includeArchived = searchParams.get('includeArchived') === 'true'
 
     if (!projectId) {
       return NextResponse.json({ error: 'Project ID required' }, { status: 400 })
     }
 
     const epics = await prisma.epic.findMany({
-      where: { projectId },
+      where: {
+        projectId,
+        // By default, exclude archived epics unless explicitly requested
+        ...(includeArchived ? {} : { isArchived: false }),
+      },
       include: {
         createdBy: {
           select: { id: true, name: true, avatarUrl: true },

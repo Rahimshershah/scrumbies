@@ -24,12 +24,14 @@ import {
 
 interface EpicTimelineProps {
   epics: Epic[]
+  archivedEpics?: Epic[]
   sprints: Sprint[]
   onBack: () => void
   onTaskClick: (task: Task) => void
   onEpicClick: (epicId: string) => void
   onEpicUpdated?: (epic: Epic) => void
   onEpicDeleted?: (epicId: string) => void
+  onEpicArchived?: (epic: Epic) => void
   projectId: string
 }
 
@@ -37,9 +39,11 @@ interface EpicWithTasks extends Epic {
   tasks: Task[]
 }
 
-export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick, onEpicUpdated, onEpicDeleted, projectId }: EpicTimelineProps) {
+export function EpicTimeline({ epics, archivedEpics = [], sprints, onBack, onTaskClick, onEpicClick, onEpicUpdated, onEpicDeleted, onEpicArchived, projectId }: EpicTimelineProps) {
   const [loading, setLoading] = useState(true)
   const [epicsWithTasks, setEpicsWithTasks] = useState<EpicWithTasks[]>([])
+  const [archivedEpicsWithTasks, setArchivedEpicsWithTasks] = useState<EpicWithTasks[]>([])
+  const [showArchived, setShowArchived] = useState(false)
   const [view, setView] = useState<'timeline' | 'list' | 'settings'>('timeline')
 
   // Settings view state
@@ -114,6 +118,32 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick,
       setEpicsWithTasks([])
     }
   }, [epics])
+
+  // Fetch archived epic details with tasks
+  useEffect(() => {
+    async function fetchArchivedEpicDetails() {
+      if (archivedEpics.length === 0) {
+        setArchivedEpicsWithTasks([])
+        return
+      }
+      try {
+        const detailedEpics = await Promise.all(
+          archivedEpics.map(async (epic) => {
+            const res = await fetch(`/api/epics/${epic.id}`)
+            if (res.ok) {
+              return await res.json()
+            }
+            return { ...epic, tasks: [] }
+          })
+        )
+        setArchivedEpicsWithTasks(detailedEpics)
+      } catch (error) {
+        console.error('Failed to fetch archived epic details:', error)
+      }
+    }
+
+    fetchArchivedEpicDetails()
+  }, [archivedEpics])
 
   // Calculate timeline range
   const { startDate, endDate, weeks } = useMemo(() => {
@@ -307,6 +337,41 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick,
     } catch (error) {
       console.error('Failed to delete epic:', error)
       alert('Failed to delete epic')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Handle archive/unarchive
+  const handleArchive = async (epic: EpicWithTasks) => {
+    const newArchivedState = !epic.isArchived
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/epics/${epic.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isArchived: newArchivedState }),
+      })
+
+      if (res.ok) {
+        const updatedEpic = await res.json()
+        if (newArchivedState) {
+          // Move from active to archived
+          setEpicsWithTasks(prev => prev.filter(e => e.id !== epic.id))
+          setArchivedEpicsWithTasks(prev => [...prev, { ...epic, isArchived: true }])
+        } else {
+          // Move from archived to active
+          setArchivedEpicsWithTasks(prev => prev.filter(e => e.id !== epic.id))
+          setEpicsWithTasks(prev => [...prev, { ...epic, isArchived: false }])
+        }
+        onEpicArchived?.(updatedEpic)
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to archive epic')
+      }
+    } catch (error) {
+      console.error('Failed to archive epic:', error)
+      alert('Failed to archive epic')
     } finally {
       setSaving(false)
     }
@@ -894,6 +959,18 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick,
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                className="h-8 px-2"
+                                onClick={() => handleArchive(epic)}
+                                disabled={saving}
+                                title="Archive"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                </svg>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => setDeleteConfirmEpic(epic)}
                                 title="Delete"
@@ -908,6 +985,96 @@ export function EpicTimeline({ epics, sprints, onBack, onTaskClick, onEpicClick,
                       </div>
                     )
                   })}
+                </div>
+              )}
+
+              {/* Archived Epics Section */}
+              {archivedEpicsWithTasks.length > 0 && (
+                <div className="mt-8 pt-6 border-t">
+                  <button
+                    onClick={() => setShowArchived(!showArchived)}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+                  >
+                    <svg
+                      className={`w-4 h-4 transition-transform ${showArchived ? 'rotate-90' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                    <span className="font-medium">Archived Epics ({archivedEpicsWithTasks.length})</span>
+                  </button>
+
+                  {showArchived && (
+                    <div className="space-y-3 opacity-75">
+                      {archivedEpicsWithTasks.map((epic) => {
+                        const stats = getTaskStats(epic.tasks || [])
+
+                        return (
+                          <div
+                            key={epic.id}
+                            className="border rounded-lg p-4 bg-muted/30"
+                          >
+                            <div className="flex items-start gap-4">
+                              {/* Color indicator */}
+                              <div
+                                className="w-4 h-4 rounded-full flex-shrink-0 mt-1"
+                                style={{ backgroundColor: epic.color }}
+                              />
+
+                              {/* Main content */}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium">{epic.name}</h3>
+                                {epic.description && (
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                                    {epic.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                                  <span>{stats.total} tasks</span>
+                                  <span>•</span>
+                                  <span>{stats.done} done</span>
+                                  <span>•</span>
+                                  <span>{stats.progress}% complete</span>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2"
+                                  onClick={() => handleArchive(epic)}
+                                  disabled={saving}
+                                  title="Unarchive"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                  </svg>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeleteConfirmEpic(epic)}
+                                  title="Delete"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

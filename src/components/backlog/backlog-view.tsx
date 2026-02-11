@@ -70,6 +70,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
   const [epics, setEpics] = useState<Epic[]>(initialEpics)
+  const [archivedEpics, setArchivedEpics] = useState<Epic[]>([])
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [showCreateSprint, setShowCreateSprint] = useState(false)
@@ -134,6 +135,37 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
     setLastOpenedTaskId(null)
     setFilterEpic(null) // Reset epic filter when switching projects
   }, [projectId, initialSprints, initialBacklog, initialEpics])
+
+  // Fetch archived epics
+  useEffect(() => {
+    async function fetchArchivedEpics() {
+      if (!projectId) return
+      try {
+        const res = await fetch(`/api/epics?projectId=${projectId}&includeArchived=true`)
+        if (res.ok) {
+          const data = await res.json()
+          // Filter to only archived epics
+          setArchivedEpics(data.filter((e: Epic) => e.isArchived))
+        }
+      } catch (error) {
+        console.error('Failed to fetch archived epics:', error)
+      }
+    }
+    fetchArchivedEpics()
+  }, [projectId])
+
+  // Handle epic archive/unarchive
+  const handleEpicArchived = useCallback((epic: Epic) => {
+    if (epic.isArchived) {
+      // Epic was archived - remove from active, add to archived
+      setEpics(prev => prev.filter(e => e.id !== epic.id))
+      setArchivedEpics(prev => [...prev, epic])
+    } else {
+      // Epic was unarchived - remove from archived, add to active
+      setArchivedEpics(prev => prev.filter(e => e.id !== epic.id))
+      setEpics(prev => [...prev, epic])
+    }
+  }, [])
 
   // Search filter function
   const matchesSearch = useCallback((task: Task, query: string): boolean => {
@@ -870,6 +902,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
           <div className="flex-1">
             <EpicTimeline
               epics={epics}
+              archivedEpics={archivedEpics}
               sprints={sprints}
               projectId={projectId}
               onBack={() => setViewingTimeline(false)}
@@ -882,7 +915,11 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                 setFilterEpic(epicId)
               }}
               onEpicUpdated={(epic) => setEpics(prev => prev.map(e => e.id === epic.id ? epic : e))}
-              onEpicDeleted={(epicId) => setEpics(prev => prev.filter(e => e.id !== epicId))}
+              onEpicDeleted={(epicId) => {
+                setEpics(prev => prev.filter(e => e.id !== epicId))
+                setArchivedEpics(prev => prev.filter(e => e.id !== epicId))
+              }}
+              onEpicArchived={handleEpicArchived}
             />
           </div>
         )}
@@ -891,11 +928,16 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
         {!viewingTimeline && !currentViewingSprint && (
           <EpicPanel
             epics={epics}
+            archivedEpics={archivedEpics}
             selectedEpicId={filterEpic}
             onSelectEpic={setFilterEpic}
             onEpicCreated={(epic) => setEpics(prev => [...prev, epic])}
             onEpicUpdated={(epic) => setEpics(prev => prev.map(e => e.id === epic.id ? epic : e))}
-            onEpicDeleted={(epicId) => setEpics(prev => prev.filter(e => e.id !== epicId))}
+            onEpicDeleted={(epicId) => {
+              setEpics(prev => prev.filter(e => e.id !== epicId))
+              setArchivedEpics(prev => prev.filter(e => e.id !== epicId))
+            }}
+            onEpicArchived={handleEpicArchived}
             onViewTimeline={() => setViewingTimeline(true)}
             projectId={projectId}
           />
