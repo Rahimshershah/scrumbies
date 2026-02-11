@@ -79,18 +79,18 @@ function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete, onArch
           : 'hover:bg-muted'
       )}
     >
-      <div className="flex items-center gap-1 px-1.5 py-1">
-        {/* Drag handle */}
+      <div className="flex items-center gap-1 px-1.5 py-1 group">
+        {/* Drag handle - visible on hover */}
         <button
           {...attributes}
           {...listeners}
           className={cn(
-            "p-0.5 rounded cursor-grab active:cursor-grabbing",
-            isSelected ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted-foreground/20'
+            "p-0.5 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity",
+            isSelected ? 'hover:bg-primary-foreground/20 opacity-100' : 'hover:bg-muted-foreground/20'
           )}
           onClick={(e) => e.stopPropagation()}
         >
-          <svg className="w-3 h-3 opacity-50" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-2 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm8-14a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm-2 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm2 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0z" />
           </svg>
         </button>
@@ -107,7 +107,7 @@ function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete, onArch
           <span className="text-xs font-medium truncate">{epic.name}</span>
           {epic._count && (
             <span className={cn(
-              "text-[10px] ml-auto",
+              "text-[10px] ml-auto pr-1",
               isSelected ? 'text-primary-foreground/70' : 'text-muted-foreground'
             )}>
               {epic._count.tasks}
@@ -115,17 +115,17 @@ function SortableEpicItem({ epic, isSelected, onSelect, onEdit, onDelete, onArch
           )}
         </button>
 
-        {/* Edit button */}
+        {/* More options button - visible on hover */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                "flex-shrink-0 p-0.5 rounded",
-                isSelected ? 'hover:bg-primary-foreground/20 text-primary-foreground' : 'hover:bg-muted-foreground/20 text-muted-foreground'
+                "flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity",
+                isSelected ? 'hover:bg-primary-foreground/20 text-primary-foreground opacity-100' : 'hover:bg-muted text-foreground'
               )}
               onClick={(e) => e.stopPropagation()}
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
               </svg>
             </button>
