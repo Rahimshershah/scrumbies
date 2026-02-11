@@ -21,6 +21,213 @@ import { DocumentAttachments } from './document-attachments'
 import { FileViewerPopup } from './file-viewer-popup'
 import { PDFViewer } from './pdf-viewer'
 import type { Document } from './spaces-view'
+import {
+  Document as DocxDocument,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  AlignmentType,
+  Table as DocxTable,
+  TableRow as DocxTableRow,
+  TableCell as DocxTableCell,
+  WidthType,
+  BorderStyle,
+} from 'docx'
+import { saveAs } from 'file-saver'
+
+// Convert TipTap JSON to docx elements
+function tiptapToDocxElements(content: any): (Paragraph | DocxTable)[] {
+  if (!content || !content.content) return [new Paragraph({ text: '' })]
+
+  const elements: (Paragraph | DocxTable)[] = []
+
+  for (const node of content.content) {
+    switch (node.type) {
+      case 'heading': {
+        const level = node.attrs?.level || 1
+        const headingLevel = level === 1 ? HeadingLevel.HEADING_1 : level === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3
+        elements.push(
+          new Paragraph({
+            heading: headingLevel,
+            children: extractTextRuns(node.content || []),
+          })
+        )
+        break
+      }
+      case 'paragraph': {
+        const alignment = node.attrs?.textAlign === 'center' ? AlignmentType.CENTER :
+                         node.attrs?.textAlign === 'right' ? AlignmentType.RIGHT : AlignmentType.LEFT
+        elements.push(
+          new Paragraph({
+            alignment,
+            children: extractTextRuns(node.content || []),
+          })
+        )
+        break
+      }
+      case 'bulletList':
+      case 'orderedList': {
+        const isOrdered = node.type === 'orderedList'
+        if (node.content) {
+          node.content.forEach((listItem: any, index: number) => {
+            if (listItem.content) {
+              listItem.content.forEach((para: any) => {
+                elements.push(
+                  new Paragraph({
+                    bullet: isOrdered ? undefined : { level: 0 },
+                    numbering: isOrdered ? { reference: 'default-numbering', level: 0 } : undefined,
+                    children: extractTextRuns(para.content || []),
+                  })
+                )
+              })
+            }
+          })
+        }
+        break
+      }
+      case 'taskList': {
+        if (node.content) {
+          node.content.forEach((taskItem: any) => {
+            const checked = taskItem.attrs?.checked ? '[x] ' : '[ ] '
+            if (taskItem.content) {
+              taskItem.content.forEach((para: any) => {
+                elements.push(
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: checked }),
+                      ...extractTextRuns(para.content || []),
+                    ],
+                  })
+                )
+              })
+            }
+          })
+        }
+        break
+      }
+      case 'blockquote': {
+        if (node.content) {
+          node.content.forEach((child: any) => {
+            elements.push(
+              new Paragraph({
+                indent: { left: 720 },
+                children: [
+                  new TextRun({ text: '| ', italics: true }),
+                  ...extractTextRuns(child.content || [], true),
+                ],
+              })
+            )
+          })
+        }
+        break
+      }
+      case 'codeBlock': {
+        const codeText = node.content?.map((c: any) => c.text || '').join('\n') || ''
+        elements.push(
+          new Paragraph({
+            shading: { fill: 'EEEEEE' },
+            children: [new TextRun({ text: codeText, font: 'Courier New', size: 20 })],
+          })
+        )
+        break
+      }
+      case 'table': {
+        if (node.content) {
+          const rows = node.content.map((row: any) => {
+            const cells = (row.content || []).map((cell: any) => {
+              const cellContent = cell.content?.map((para: any) =>
+                new Paragraph({ children: extractTextRuns(para.content || []) })
+              ) || [new Paragraph({ text: '' })]
+              return new DocxTableCell({
+                children: cellContent,
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                },
+              })
+            })
+            return new DocxTableRow({ children: cells })
+          })
+          if (rows.length > 0) {
+            elements.push(new DocxTable({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }))
+          }
+        }
+        break
+      }
+      default:
+        // For unknown types, try to extract any text
+        if (node.content) {
+          elements.push(
+            new Paragraph({
+              children: extractTextRuns(node.content),
+            })
+          )
+        }
+    }
+  }
+
+  return elements.length > 0 ? elements : [new Paragraph({ text: '' })]
+}
+
+function extractTextRuns(content: any[], inheritItalic = false): TextRun[] {
+  if (!content || content.length === 0) return []
+
+  return content.map((item: any) => {
+    if (item.type === 'text') {
+      const marks = item.marks || []
+      const isBold = marks.some((m: any) => m.type === 'bold')
+      const isItalic = inheritItalic || marks.some((m: any) => m.type === 'italic')
+      const isUnderline = marks.some((m: any) => m.type === 'underline')
+      const isStrike = marks.some((m: any) => m.type === 'strike')
+      const isCode = marks.some((m: any) => m.type === 'code')
+      const link = marks.find((m: any) => m.type === 'link')
+
+      return new TextRun({
+        text: item.text || '',
+        bold: isBold,
+        italics: isItalic,
+        underline: isUnderline ? {} : undefined,
+        strike: isStrike,
+        font: isCode ? 'Courier New' : undefined,
+        size: isCode ? 20 : undefined,
+      })
+    }
+    return new TextRun({ text: '' })
+  })
+}
+
+async function exportToWord(document: Document) {
+  const doc = new DocxDocument({
+    numbering: {
+      config: [{
+        reference: 'default-numbering',
+        levels: [{
+          level: 0,
+          format: 'decimal',
+          text: '%1.',
+          alignment: AlignmentType.LEFT,
+        }],
+      }],
+    },
+    sections: [{
+      properties: {},
+      children: [
+        new Paragraph({
+          heading: HeadingLevel.TITLE,
+          children: [new TextRun({ text: document.title, bold: true })],
+        }),
+        new Paragraph({ text: '' }), // Spacer
+        ...tiptapToDocxElements(document.content),
+      ],
+    }],
+  })
+
+  const blob = await Packer.toBlob(doc)
+  saveAs(blob, `${document.title.replace(/[^a-zA-Z0-9]/g, '_')}.docx`)
+}
 
 interface DocumentEditorProps {
   document: Document
@@ -279,6 +486,19 @@ export function DocumentEditor({ document, currentUser, onUpdate }: DocumentEdit
                   Save
                 </>
               )}
+            </Button>
+          )}
+          {!isFileType && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => exportToWord(document)}
+              title="Download as Word document"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download Word
             </Button>
           )}
           <Button

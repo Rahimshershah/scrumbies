@@ -57,6 +57,21 @@ export function AppShell({
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null)
   const [taskToOpen, setTaskToOpen] = useState<string | null>(null)
 
+  // Fix malformed URLs with hash before query params (e.g., /#?view=backlog -> /?view=backlog)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash
+      // Check for malformed URLs like #?view=backlog or #?task=...
+      if (hash.startsWith('#?')) {
+        const fixedSearch = hash.slice(1) // Remove the # to get ?view=backlog...
+        const newUrl = window.location.pathname + fixedSearch
+        window.history.replaceState({}, '', newUrl)
+        // Reload to apply the fixed URL
+        window.location.reload()
+      }
+    }
+  }, [])
+
   // Restore view from URL query param or localStorage on mount
   useEffect(() => {
     const viewParam = searchParams?.get('view') as AppView | null
