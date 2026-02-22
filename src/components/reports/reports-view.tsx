@@ -136,7 +136,6 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
     setLoading(true)
     try {
-      // Get the styled HTML from the API
       const res = await fetch('/api/reports/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,68 +144,21 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
           taskOptions,
           reportType,
           goLiveDates,
-          format: 'html',
+          format: 'pdf',
         }),
       })
 
-      if (!res.ok) throw new Error('Failed to fetch report HTML')
+      if (!res.ok) throw new Error('Failed to generate PDF')
 
-      const htmlString = await res.text()
-
-      // Parse the HTML to extract styles and body content
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(htmlString, 'text/html')
-
-      // Create an off-screen container that matches A4 width
-      const container = document.createElement('div')
-      container.style.position = 'fixed'
-      container.style.left = '-9999px'
-      container.style.top = '0'
-      container.style.width = '780px'
-      container.style.background = '#fff'
-
-      // Copy styles from the parsed document
-      const styles = doc.querySelectorAll('style')
-      styles.forEach(style => container.appendChild(style.cloneNode(true)))
-
-      // Copy body content and apply body-level styles
-      const contentDiv = document.createElement('div')
-      contentDiv.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      contentDiv.style.fontSize = '10px'
-      contentDiv.style.lineHeight = '1.4'
-      contentDiv.style.color = '#1a1a1a'
-      contentDiv.style.padding = '24px'
-      contentDiv.style.background = '#fff'
-      contentDiv.innerHTML = doc.body.innerHTML
-      container.appendChild(contentDiv)
-
-      document.body.appendChild(container)
-
-      // Wait for any images to load
-      await new Promise(resolve => setTimeout(resolve, 300))
-
-      // Generate PDF client-side
-      const html2pdf = (await import('html2pdf.js')).default
-      await html2pdf().set({
-        margin: [5, 5, 5, 5],
-        filename: `sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          width: 780,
-          letterRendering: true,
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait',
-        },
-        pagebreak: { mode: ['avoid-all', 'css'], before: ['.team-section'] },
-      }).from(contentDiv).save()
-
-      // Clean up
-      document.body.removeChild(container)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `sprint-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Failed to download PDF:', error)
     } finally {
