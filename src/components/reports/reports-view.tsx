@@ -107,7 +107,30 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
       if (res.ok) {
         const data = await res.json()
-        setReportData(data.mergedReport)
+        const mergedReport = data.mergedReport as MergedReportData
+        setReportData(mergedReport)
+
+        // Auto-populate go-live dates for LIVE tasks with their sprint's end date
+        const sprintEndDateMap = new Map<string, string>()
+        for (const sprint of sprints) {
+          if (sprint.endDate) {
+            sprintEndDateMap.set(sprint.name, sprint.endDate.split('T')[0])
+          }
+        }
+        const initialGoLiveDates: Record<string, string> = {}
+        for (const teamGroup of mergedReport.tasksByTeam) {
+          for (const epicGroup of teamGroup.epicGroups) {
+            for (const task of epicGroup.tasks) {
+              if (task.status === 'LIVE' && task.sprintName) {
+                const endDate = sprintEndDateMap.get(task.sprintName)
+                if (endDate) {
+                  initialGoLiveDates[`task:${task.id}`] = endDate
+                }
+              }
+            }
+          }
+        }
+        setGoLiveDates(initialGoLiveDates)
       }
     } catch (error) {
       console.error('Failed to generate report:', error)
