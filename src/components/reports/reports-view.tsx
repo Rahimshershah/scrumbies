@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 interface ReportsViewProps {
@@ -16,6 +17,7 @@ interface ReportsViewProps {
 
 interface ReportTask extends Task {
   sprintCount?: number
+  sprintName?: string
   attachments?: { id: string; filename: string; url: string }[]
   aiDescriptionSummary?: string | null
   aiCommentsSummary?: string | null
@@ -23,13 +25,19 @@ interface ReportTask extends Task {
   hasDescription?: boolean
 }
 
-interface ReportData {
-  sprint: Sprint
-  tasksByEpic: {
-    epic: Epic | null
+interface TeamGroup {
+  team: { key: string; name: string; color: string; bgColor: string } | null
+  epicGroups: {
+    epic: { id: string; name: string; color: string; description?: string | null } | null
     tasks: ReportTask[]
-    epicSummary?: string // AI summary of all tasks in this epic
+    epicSummary?: string
   }[]
+}
+
+interface MergedReportData {
+  sprintNames: string[]
+  sprintDateRange: { start: string; end: string } | null
+  tasksByTeam: TeamGroup[]
   generatedAt: string
   aiSummary?: string
 }
@@ -40,16 +48,18 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
   const [selectedSprintIds, setSelectedSprintIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [reportData, setReportData] = useState<ReportData[] | null>(null)
+  const [reportData, setReportData] = useState<MergedReportData | null>(null)
   const [reportType, setReportType] = useState<ReportType>('detailed')
-  
+  const [goLiveDates, setGoLiveDates] = useState<Record<string, string>>({})
+
   // Task-level options - only for images now
   const [taskOptions, setTaskOptions] = useState<Record<string, { includeImages: boolean }>>({})
 
-  const completedSprints = sprints.filter(s => s.status === 'COMPLETED')
+  // Include both COMPLETED and UAT sprints
+  const availableSprints = sprints.filter(s => s.status === 'COMPLETED' || s.status === 'UAT')
 
   const toggleSprint = (sprintId: string) => {
-    setSelectedSprintIds(prev => 
+    setSelectedSprintIds(prev =>
       prev.includes(sprintId)
         ? prev.filter(id => id !== sprintId)
         : [...prev, sprintId]
@@ -57,11 +67,25 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
   }
 
   const selectAllSprints = () => {
-    setSelectedSprintIds(completedSprints.map(s => s.id))
+    setSelectedSprintIds(availableSprints.map(s => s.id))
   }
 
   const clearSelection = () => {
     setSelectedSprintIds([])
+  }
+
+  const setEpicGoLiveDate = (epicId: string, date: string) => {
+    setGoLiveDates(prev => ({ ...prev, [`epic:${epicId}`]: date }))
+  }
+
+  const setTaskGoLiveDate = (taskId: string, date: string) => {
+    setGoLiveDates(prev => ({ ...prev, [`task:${taskId}`]: date }))
+  }
+
+  const getGoLiveDate = (taskId: string, epicId: string | null | undefined): string => {
+    if (goLiveDates[`task:${taskId}`]) return goLiveDates[`task:${taskId}`]
+    if (epicId && goLiveDates[`epic:${epicId}`]) return goLiveDates[`epic:${epicId}`]
+    return ''
   }
 
   const generateReport = async () => {
@@ -69,6 +93,7 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
     setGenerating(true)
     setReportData(null)
+    setGoLiveDates({})
     try {
       const res = await fetch('/api/reports/generate', {
         method: 'POST',
@@ -82,7 +107,7 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
       if (res.ok) {
         const data = await res.json()
-        setReportData(data.reports)
+        setReportData(data.mergedReport)
       }
     } catch (error) {
       console.error('Failed to generate report:', error)
@@ -96,23 +121,22 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
     setLoading(true)
     try {
-      // Request PDF format from server (uses Puppeteer for proper PDF with selectable text)
       const res = await fetch('/api/reports/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reports: reportData,
+          mergedReport: reportData,
           taskOptions,
           reportType,
+          goLiveDates,
           format: 'pdf',
         }),
       })
 
       if (res.ok) {
         const contentType = res.headers.get('Content-Type')
-        
+
         if (contentType?.includes('application/pdf')) {
-          // Server returned a PDF - download it directly
           const blob = await res.blob()
           const url = URL.createObjectURL(blob)
           const link = document.createElement('a')
@@ -123,7 +147,6 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
           document.body.removeChild(link)
           URL.revokeObjectURL(url)
         } else {
-          // Fallback: Server returned HTML, open in new tab for printing
           const html = await res.text()
           const blob = new Blob([html], { type: 'text/html' })
           const url = URL.createObjectURL(blob)
@@ -153,8 +176,8 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
   }
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', { 
-      month: 'short', 
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       year: 'numeric'
     })
@@ -168,7 +191,7 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
           <div>
             <h1 className="text-xl font-bold">Sprint Reports</h1>
             <p className="text-sm text-muted-foreground">
-              AI-powered summaries for completed sprints
+              AI-powered summaries for completed and UAT sprints
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -216,7 +239,7 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {selectedSprintIds.length} of {completedSprints.length} selected
+              {selectedSprintIds.length} of {availableSprints.length} selected
             </p>
           </div>
 
@@ -260,20 +283,21 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
               </label>
             </div>
           </div>
-          
+
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
-              {completedSprints.length === 0 ? (
+              {availableSprints.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <svg className="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  <p className="text-xs">No completed sprints</p>
+                  <p className="text-xs">No completed or UAT sprints</p>
                 </div>
               ) : (
-                completedSprints.map((sprint) => {
+                availableSprints.map((sprint) => {
                   const isSelected = selectedSprintIds.includes(sprint.id)
                   const completedTasks = sprint.tasks.filter(t => t.status === 'DONE' || t.status === 'LIVE').length
+                  const isUAT = sprint.status === 'UAT'
 
                   return (
                     <button
@@ -287,7 +311,14 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
                       <div className="flex items-center gap-2">
                         <Checkbox checked={isSelected} className="h-3.5 w-3.5" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-xs truncate">{sprint.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-xs truncate">{sprint.name}</span>
+                            {isUAT && (
+                              <Badge variant="outline" className="text-[8px] h-4 bg-amber-50 text-amber-700 border-amber-200 flex-shrink-0">
+                                UAT
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-[10px] text-muted-foreground">
                             {sprint.endDate && formatDate(sprint.endDate)} • {completedTasks}/{sprint.tasks.length}
                           </div>
@@ -323,8 +354,8 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
                     {reportType === 'detailed' ? 'Detailed Report' : 'Summarized Report'}
                   </h2>
                   <p className="text-[10px] text-muted-foreground">
-                    {reportData.length} sprint{reportData.length !== 1 ? 's' : ''}
-                    {reportType === 'detailed' && ' • Toggle images per task'}
+                    {reportData.sprintNames.join(' + ')}
+                    {reportType === 'detailed' && ' \u2022 Toggle images per task'}
                   </p>
                 </div>
                 <Button size="sm" onClick={downloadPDF} disabled={loading}>
@@ -334,172 +365,223 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
 
               <ScrollArea className="flex-1">
                 <div className="p-4 space-y-4 max-w-3xl mx-auto">
-                  {reportData.map((report) => (
-                    <div key={report.sprint.id} className="bg-background rounded-lg border shadow-sm">
-                      {/* Sprint Header */}
-                      <div className="p-3 border-b bg-muted/30">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-bold">{report.sprint.name}</h3>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              {report.sprint.startDate && report.sprint.endDate && (
-                                <>{formatDate(report.sprint.startDate)} - {formatDate(report.sprint.endDate)} • </>
-                              )}
-                              {report.tasksByEpic.reduce((sum, e) => sum + e.tasks.length, 0)} tasks
-                            </div>
-                          </div>
-                          <Badge variant="secondary" className="text-[10px]">Completed</Badge>
-                        </div>
-                        
-                        {/* Sprint AI Summary */}
-                        {report.aiSummary && (
-                          <div className="mt-2 p-2 bg-primary/5 rounded border border-primary/20">
-                            <div className="flex items-center gap-1 text-[10px] font-medium text-primary mb-0.5">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              Sprint Summary
-                            </div>
-                            <p className="text-xs text-muted-foreground">{report.aiSummary}</p>
-                          </div>
+                  {/* Combined Report Header */}
+                  <div className="bg-background rounded-lg border shadow-sm">
+                    <div className="p-3 bg-muted/30 rounded-t-lg">
+                      <h3 className="font-bold">{reportData.sprintNames.join(' + ')}</h3>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {reportData.sprintDateRange && (
+                          <>{formatDate(reportData.sprintDateRange.start)} - {formatDate(reportData.sprintDateRange.end)} &bull; </>
                         )}
+                        {reportData.tasksByTeam.reduce((sum, tg) => sum + tg.epicGroups.reduce((s, eg) => s + eg.tasks.length, 0), 0)} tasks
                       </div>
 
-                      {/* Tasks by Epic */}
-                      <div className="divide-y">
-                        {report.tasksByEpic.map((group) => (
-                          <div key={group.epic?.id || 'no-epic'} className="p-3">
-                            {/* Epic Header */}
-                            <div className="flex items-center gap-2 mb-2">
-                              {group.epic ? (
-                                <>
-                                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.epic.color }} />
-                                  <span className="font-medium text-xs">{group.epic.name}</span>
-                                </>
-                              ) : (
-                                <span className="text-xs text-muted-foreground italic">No Epic</span>
-                              )}
-                              <Badge variant="outline" className="text-[9px] h-4">
-                                {group.tasks.length}
-                              </Badge>
-                            </div>
+                      {reportData.aiSummary && (
+                        <div className="mt-2 p-2 bg-primary/5 rounded border border-primary/20">
+                          <div className="flex items-center gap-1 text-[10px] font-medium text-primary mb-0.5">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Overall Summary
+                          </div>
+                          <p className="text-xs text-muted-foreground">{reportData.aiSummary}</p>
+                        </div>
+                      )}
+                    </div>
 
-                            {/* Summarized View - Show epic summary instead of individual tasks */}
-                            {reportType === 'summarized' ? (
-                              <div className="p-2 rounded border bg-muted/20">
-                                {group.epicSummary ? (
-                                  <p className="text-xs text-muted-foreground leading-relaxed">{group.epicSummary}</p>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground italic">
-                                    {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''} completed
-                                  </p>
-                                )}
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  {group.tasks.map((task) => (
-                                    <span key={task.id} className="text-[9px] px-1.5 py-0.5 bg-muted rounded font-mono">
-                                      {task.taskKey}
-                                    </span>
-                                  ))}
+                    {/* Team Sections */}
+                    <div className="divide-y">
+                      {reportData.tasksByTeam.map((teamGroup) => (
+                        <div key={teamGroup.team?.key || 'no-team'}>
+                          {/* Team Header */}
+                          <div
+                            className="px-3 py-2 flex items-center gap-2 border-b"
+                            style={{
+                              backgroundColor: teamGroup.team ? teamGroup.team.bgColor : '#f8fafc',
+                              borderLeft: teamGroup.team ? `4px solid ${teamGroup.team.color}` : '4px solid #94a3b8'
+                            }}
+                          >
+                            <span
+                              className="font-semibold text-sm"
+                              style={{ color: teamGroup.team?.color || '#475569' }}
+                            >
+                              {teamGroup.team?.name || 'No Team'}
+                            </span>
+                            <Badge variant="outline" className="text-[9px] h-4">
+                              {teamGroup.epicGroups.reduce((s, eg) => s + eg.tasks.length, 0)} tasks
+                            </Badge>
+                          </div>
+
+                          {/* Epic Groups within this team */}
+                          <div className="divide-y">
+                            {teamGroup.epicGroups.map((group) => (
+                              <div key={group.epic?.id || 'no-epic'} className="p-3">
+                                {/* Epic Header with Go-Live Date */}
+                                <div className="flex items-center gap-2 mb-2">
+                                  {group.epic ? (
+                                    <>
+                                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: group.epic.color }} />
+                                      <span className="font-medium text-xs">{group.epic.name}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">No Epic</span>
+                                  )}
+                                  <Badge variant="outline" className="text-[9px] h-4">
+                                    {group.tasks.length}
+                                  </Badge>
+
+                                  {/* Epic-level Go-Live Date */}
+                                  {group.epic && (
+                                    <div className="ml-auto flex items-center gap-1.5">
+                                      <span className="text-[9px] text-muted-foreground">Go Live:</span>
+                                      <Input
+                                        type="date"
+                                        value={goLiveDates[`epic:${group.epic.id}`] || ''}
+                                        onChange={(e) => setEpicGoLiveDate(group.epic!.id, e.target.value)}
+                                        className="h-6 w-32 text-[10px] px-1.5"
+                                      />
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ) : (
-                              /* Detailed View - Show individual tasks */
-                              <div className="space-y-1.5">
-                                {group.tasks.map((task) => {
-                                  const opts = taskOptions[task.id] || { includeImages: false }
-                                  const isComplete = task.status === 'DONE' || task.status === 'LIVE'
-                                  const hasImages = task.attachments && task.attachments.length > 0
-                                  
-                                  return (
-                                    <div key={task.id} className="p-2 rounded border bg-muted/20">
-                                      {/* Task header */}
-                                      <div className="flex items-start gap-1.5">
-                                        <div className={cn(
-                                          "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
-                                          isComplete ? "bg-green-500" : "bg-amber-500"
-                                        )} />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-1.5">
-                                            <span className="text-[9px] font-mono text-primary/70">{task.taskKey}</span>
-                                            <span className="font-medium text-xs truncate">{task.title}</span>
-                                            {!isComplete && (
-                                              <Badge variant="outline" className="text-[8px] h-3.5 bg-amber-50 text-amber-700 border-amber-200">
-                                                Carried
-                                              </Badge>
-                                            )}
-                                          </div>
-                                          
-                                          {/* AI Description Summary - only if exists */}
-                                          {task.aiDescriptionSummary && (
-                                            <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
-                                              {task.aiDescriptionSummary}
-                                            </p>
-                                          )}
 
-                                          {/* AI Comments Summary - only if exists */}
-                                          {task.aiCommentsSummary && (
-                                            <div className="mt-1.5 pl-2 border-l-2 border-primary/30">
-                                              <p className="text-[10px] text-muted-foreground italic">
-                                                💬 {task.aiCommentsSummary}
-                                              </p>
-                                            </div>
-                                          )}
+                                {/* Summarized View */}
+                                {reportType === 'summarized' ? (
+                                  <div className="p-2 rounded border bg-muted/20">
+                                    {group.epicSummary ? (
+                                      <p className="text-xs text-muted-foreground leading-relaxed">{group.epicSummary}</p>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground italic">
+                                        {group.tasks.length} task{group.tasks.length !== 1 ? 's' : ''}
+                                      </p>
+                                    )}
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                      {group.tasks.map((task) => (
+                                        <span key={task.id} className="text-[9px] px-1.5 py-0.5 bg-muted rounded font-mono">
+                                          {task.taskKey}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Detailed View */
+                                  <div className="space-y-1.5">
+                                    {group.tasks.map((task) => {
+                                      const opts = taskOptions[task.id] || { includeImages: false }
+                                      const isComplete = task.status === 'DONE' || task.status === 'LIVE'
+                                      const hasImages = task.attachments && task.attachments.length > 0
+                                      const taskDate = getGoLiveDate(task.id, group.epic?.id)
 
-                                          {/* Meta + Image toggle */}
-                                          <div className="flex items-center gap-3 mt-1.5">
-                                            {task.assignee && (
-                                              <span className="text-[9px] text-muted-foreground">
-                                                👤 {task.assignee.name}
-                                              </span>
-                                            )}
-                                            {task.sprintCount && task.sprintCount > 1 && (
-                                              <span className="text-[9px] text-muted-foreground">
-                                                🔄 {task.sprintCount} sprints
-                                              </span>
-                                            )}
-                                            {hasImages && (
-                                              <label className="flex items-center gap-1 text-[9px] cursor-pointer ml-auto">
-                                                <Checkbox 
-                                                  checked={opts.includeImages}
-                                                  onCheckedChange={() => toggleTaskImages(task.id)}
-                                                  className="h-3 w-3"
-                                                />
-                                                <span>Images ({task.attachments?.length})</span>
-                                              </label>
-                                            )}
-                                          </div>
+                                      return (
+                                        <div key={task.id} className="p-2 rounded border bg-muted/20">
+                                          {/* Task header */}
+                                          <div className="flex items-start gap-1.5">
+                                            <div className={cn(
+                                              "w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0",
+                                              isComplete ? "bg-green-500" : "bg-amber-500"
+                                            )} />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[9px] font-mono text-primary/70">{task.taskKey}</span>
+                                                <span className="font-medium text-xs truncate">{task.title}</span>
+                                                {!isComplete && (
+                                                  <Badge variant="outline" className="text-[8px] h-3.5 bg-amber-50 text-amber-700 border-amber-200">
+                                                    Carried
+                                                  </Badge>
+                                                )}
+                                                {task.sprintName && (
+                                                  <Badge variant="secondary" className="text-[8px] h-3.5">
+                                                    {task.sprintName}
+                                                  </Badge>
+                                                )}
+                                              </div>
 
-                                          {/* Image thumbnails if enabled */}
-                                          {opts.includeImages && task.attachments && task.attachments.length > 0 && (
-                                            <div className="mt-1.5 flex gap-1 flex-wrap">
-                                              {task.attachments.slice(0, 4).map((att) => (
-                                                <div key={att.id} className="w-10 h-10 rounded border bg-muted overflow-hidden">
-                                                  {att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                                                    <img src={att.url} alt="" className="w-full h-full object-cover" />
-                                                  ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-[8px]">📄</div>
+                                              {task.aiDescriptionSummary && (
+                                                <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                                                  {task.aiDescriptionSummary}
+                                                </p>
+                                              )}
+
+                                              {task.aiCommentsSummary && (
+                                                <div className="mt-1.5 pl-2 border-l-2 border-primary/30">
+                                                  <p className="text-[10px] text-muted-foreground italic">
+                                                    {task.aiCommentsSummary}
+                                                  </p>
+                                                </div>
+                                              )}
+
+                                              {/* Meta + Go-Live Date + Image toggle */}
+                                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                                {task.assignee && (
+                                                  <span className="text-[9px] text-muted-foreground">
+                                                    {task.assignee.name}
+                                                  </span>
+                                                )}
+                                                {task.sprintCount && task.sprintCount > 1 && (
+                                                  <span className="text-[9px] text-muted-foreground">
+                                                    {task.sprintCount} sprints
+                                                  </span>
+                                                )}
+
+                                                {/* Task-level Go-Live Date */}
+                                                <div className="flex items-center gap-1 ml-auto">
+                                                  <Input
+                                                    type="date"
+                                                    value={goLiveDates[`task:${task.id}`] || ''}
+                                                    onChange={(e) => setTaskGoLiveDate(task.id, e.target.value)}
+                                                    className={cn(
+                                                      "h-5 w-28 text-[9px] px-1",
+                                                      !goLiveDates[`task:${task.id}`] && taskDate ? "text-muted-foreground" : ""
+                                                    )}
+                                                  />
+                                                  {!goLiveDates[`task:${task.id}`] && taskDate && (
+                                                    <span className="text-[8px] text-muted-foreground italic">(epic)</span>
                                                   )}
                                                 </div>
-                                              ))}
-                                              {task.attachments.length > 4 && (
-                                                <div className="w-10 h-10 rounded border bg-muted flex items-center justify-center text-[9px]">
-                                                  +{task.attachments.length - 4}
+
+                                                {hasImages && (
+                                                  <label className="flex items-center gap-1 text-[9px] cursor-pointer">
+                                                    <Checkbox
+                                                      checked={opts.includeImages}
+                                                      onCheckedChange={() => toggleTaskImages(task.id)}
+                                                      className="h-3 w-3"
+                                                    />
+                                                    <span>Images ({task.attachments?.length})</span>
+                                                  </label>
+                                                )}
+                                              </div>
+
+                                              {opts.includeImages && task.attachments && task.attachments.length > 0 && (
+                                                <div className="mt-1.5 flex gap-1 flex-wrap">
+                                                  {task.attachments.slice(0, 4).map((att) => (
+                                                    <div key={att.id} className="w-10 h-10 rounded border bg-muted overflow-hidden">
+                                                      {att.filename.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                                        <img src={att.url} alt="" className="w-full h-full object-cover" />
+                                                      ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-[8px]">file</div>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                  {task.attachments.length > 4 && (
+                                                    <div className="w-10 h-10 rounded border bg-muted flex items-center justify-center text-[9px]">
+                                                      +{task.attachments.length - 4}
+                                                    </div>
+                                                  )}
                                                 </div>
                                               )}
                                             </div>
-                                          )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  )
-                                })}
+                                      )
+                                    })}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
               </ScrollArea>
             </>
