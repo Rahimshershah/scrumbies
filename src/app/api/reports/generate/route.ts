@@ -71,12 +71,16 @@ export async function POST(request: NextRequest) {
 
     // Flatten all tasks, deduplicate by task ID (keep first occurrence)
     const seenTaskIds = new Set<string>()
-    const allTasks: (typeof sprints[0]['tasks'][0] & { sprintName: string })[] = []
+    const allTasks: (typeof sprints[0]['tasks'][0] & { sprintName: string; sprintEndDate: string | null })[] = []
     for (const sprint of sprints) {
       for (const task of sprint.tasks) {
         if (!seenTaskIds.has(task.id)) {
           seenTaskIds.add(task.id)
-          allTasks.push({ ...task, sprintName: sprint.name })
+          allTasks.push({
+            ...task,
+            sprintName: sprint.name,
+            sprintEndDate: sprint.endDate ? sprint.endDate.toISOString().split('T')[0] : null,
+          })
         }
       }
     }

@@ -18,6 +18,7 @@ interface ReportsViewProps {
 interface ReportTask extends Task {
   sprintCount?: number
   sprintName?: string
+  sprintEndDate?: string | null
   attachments?: { id: string; filename: string; url: string }[]
   aiDescriptionSummary?: string | null
   aiCommentsSummary?: string | null
@@ -111,21 +112,12 @@ export function ReportsView({ projectId, sprints, epics }: ReportsViewProps) {
         setReportData(mergedReport)
 
         // Auto-populate go-live dates for LIVE tasks with their sprint's end date
-        const sprintEndDateMap = new Map<string, string>()
-        for (const sprint of sprints) {
-          if (sprint.endDate) {
-            sprintEndDateMap.set(sprint.name, sprint.endDate.split('T')[0])
-          }
-        }
         const initialGoLiveDates: Record<string, string> = {}
         for (const teamGroup of mergedReport.tasksByTeam) {
           for (const epicGroup of teamGroup.epicGroups) {
             for (const task of epicGroup.tasks) {
-              if (task.status === 'LIVE' && task.sprintName) {
-                const endDate = sprintEndDateMap.get(task.sprintName)
-                if (endDate) {
-                  initialGoLiveDates[`task:${task.id}`] = endDate
-                }
+              if (task.status === 'LIVE' && (task as ReportTask).sprintEndDate) {
+                initialGoLiveDates[`task:${task.id}`] = (task as ReportTask).sprintEndDate!
               }
             }
           }
