@@ -201,7 +201,8 @@ function generateReportHTML(
 
         @media print {
           body { padding: 16px; }
-          .team-section { page-break-inside: avoid; }
+          .task { page-break-inside: avoid; }
+          .epic-header { page-break-inside: avoid; }
           a { color: #6366f1 !important; }
         }
       </style>
@@ -400,8 +401,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No report data' }, { status: 400 })
     }
 
-    const url = new URL(request.url)
-    const baseUrl = `${url.protocol}//${url.host}`
+    // Use NEXTAUTH_URL for public-facing links, fall back to request host header
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+    const baseUrl = process.env.NEXTAUTH_URL
+      || (forwardedHost ? `${forwardedProto}://${forwardedHost}` : `${new URL(request.url).protocol}//${new URL(request.url).host}`)
 
     const html = generateReportHTML(mergedReport, taskOptions, reportType, goLiveDates, baseUrl)
 
