@@ -139,7 +139,7 @@ function generateReportHTML(
           padding: 3px 8px; border-radius: 4px;
           display: inline-block; margin: 2px 4px 2px 0;
         }
-        .task-chip a { color: #6366f1; text-decoration: none; }
+        .task-chip a { color: #6366f1; text-decoration: underline; }
 
         .task {
           border: 1px solid #e2e8f0; border-radius: 6px;
@@ -148,7 +148,7 @@ function generateReportHTML(
         .task-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .task-key {
           font-family: 'SF Mono', Monaco, Consolas, monospace;
-          font-size: 10px; color: #6366f1; font-weight: 500; text-decoration: none;
+          font-size: 10px; color: #6366f1; font-weight: 500; text-decoration: underline;
         }
         .task-title { font-weight: 500; font-size: 11px; color: #1e293b; flex: 1; }
         .sprint-badge {
