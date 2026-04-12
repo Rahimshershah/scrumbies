@@ -83,6 +83,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   const [filterAssignee, setFilterAssignee] = useState<string | 'ALL'>('ALL')
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'ALL'>('ALL')
   const [filterEpic, setFilterEpic] = useState<string | null>(null) // null = all, 'none' = no epic, epicId = specific epic
+  const [groupBy, setGroupBy] = useState<'none' | 'status' | 'assignee'>('none')
   const [showEpicPanel, setShowEpicPanel] = useState(true) // Always show epic panel
 
   // Multi-select state
@@ -1113,7 +1114,18 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                   </SelectContent>
                 </Select>
 
-                {(filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL' || filterEpic !== null || searchQuery.trim()) && (
+                <Select value={groupBy} onValueChange={(value) => setGroupBy(value as 'none' | 'status' | 'assignee')}>
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue placeholder="Group by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Grouping</SelectItem>
+                    <SelectItem value="status">Group by Status</SelectItem>
+                    <SelectItem value="assignee">Group by Person</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {(filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL' || filterEpic !== null || groupBy !== 'none' || searchQuery.trim()) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1123,6 +1135,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                       setFilterAssignee('ALL')
                       setFilterStatus('ALL')
                       setFilterEpic(null)
+                      setGroupBy('none')
                     }}
                     className="h-9 text-xs"
                   >
@@ -1217,6 +1230,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     }}
                     onOpenInDedicatedView={setViewingSprint}
                     variant="active"
+                    groupBy={groupBy}
                     selectedTaskIds={selectedTaskIds}
                     onTaskSelectToggle={handleTaskSelectToggle}
                   />
@@ -1252,6 +1266,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                     onSprintUpdate={handleSprintUpdate}
                     onOpenInDedicatedView={setViewingSprint}
                     variant="planned"
+                    groupBy={groupBy}
                     selectedTaskIds={selectedTaskIds}
                     onTaskSelectToggle={handleTaskSelectToggle}
                   />

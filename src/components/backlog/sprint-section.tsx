@@ -37,6 +37,7 @@ interface SprintSectionProps {
   onOpenInDedicatedView?: (sprint: Sprint) => void
   variant?: 'active' | 'planned'
   selectedTaskId?: string | null
+  groupBy?: 'none' | 'status' | 'assignee'
   // Multi-select props
   selectedTaskIds?: Set<string>
   onTaskSelectToggle?: (taskId: string, element: HTMLElement) => void
@@ -65,6 +66,7 @@ export function SprintSection({
   onSprintUAT,
   onOpenInDedicatedView,
   variant = 'planned',
+  groupBy = 'none',
   selectedTaskIds = new Set(),
   onTaskSelectToggle,
 }: SprintSectionProps) {
@@ -82,6 +84,73 @@ export function SprintSection({
   const sortedTasks = [...sprint.tasks].sort((a, b) => a.order - b.order)
   const taskCount = sprint.tasks.length
   const taskIds = sortedTasks.map((t) => t.id)
+
+  // Status display labels and order
+  const statusLabels: Record<string, string> = {
+    'TODO': 'To Do',
+    'IN_PROGRESS': 'In Progress',
+    'READY_TO_TEST': 'Ready to Test',
+    'BLOCKED': 'Blocked',
+    'DONE': 'Done',
+    'LIVE': 'Live',
+  }
+  const statusOrder = ['TODO', 'IN_PROGRESS', 'READY_TO_TEST', 'BLOCKED', 'DONE', 'LIVE']
+  const statusColors: Record<string, string> = {
+    'TODO': 'text-muted-foreground',
+    'IN_PROGRESS': 'text-blue-600 dark:text-blue-400',
+    'READY_TO_TEST': 'text-purple-600 dark:text-purple-400',
+    'BLOCKED': 'text-red-600 dark:text-red-400',
+    'DONE': 'text-green-600 dark:text-green-400',
+    'LIVE': 'text-emerald-600 dark:text-emerald-400',
+  }
+
+  // Group tasks when groupBy is active
+  const groupedTasks = (() => {
+    if (groupBy === 'none') return null
+
+    if (groupBy === 'status') {
+      const groups: { key: string; label: string; color: string; tasks: typeof sortedTasks }[] = []
+      for (const status of statusOrder) {
+        const tasks = sortedTasks.filter(t => t.status === status)
+        if (tasks.length > 0) {
+          groups.push({ key: status, label: statusLabels[status] || status, color: statusColors[status] || '', tasks })
+        }
+      }
+      return groups
+    }
+
+    if (groupBy === 'assignee') {
+      const groups: { key: string; label: string; color: string; tasks: typeof sortedTasks }[] = []
+      // Group by each user
+      const userMap = new Map<string, typeof sortedTasks>()
+      const unassigned: typeof sortedTasks = []
+      for (const task of sortedTasks) {
+        if (task.assigneeId) {
+          const existing = userMap.get(task.assigneeId) || []
+          existing.push(task)
+          userMap.set(task.assigneeId, existing)
+        } else {
+          unassigned.push(task)
+        }
+      }
+      // Sort users alphabetically
+      const userEntries = [...userMap.entries()].sort((a, b) => {
+        const nameA = users.find(u => u.id === a[0])?.name || ''
+        const nameB = users.find(u => u.id === b[0])?.name || ''
+        return nameA.localeCompare(nameB)
+      })
+      for (const [userId, tasks] of userEntries) {
+        const user = users.find(u => u.id === userId)
+        groups.push({ key: userId, label: user?.name || 'Unknown', color: 'text-foreground', tasks })
+      }
+      if (unassigned.length > 0) {
+        groups.push({ key: 'unassigned', label: 'Unassigned', color: 'text-muted-foreground', tasks: unassigned })
+      }
+      return groups
+    }
+
+    return null
+  })()
   const openTasksCount = sprint.tasks.filter(t => t.status !== 'DONE' && t.status !== 'LIVE').length
   // Count tasks that would be handled in UAT (TODO, IN_PROGRESS, BLOCKED)
   const uatTasksToHandleCount = sprint.tasks.filter(t =>
@@ -307,21 +376,51 @@ export function SprintSection({
           )}
         >
           <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-            {sortedTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                users={users}
-                epics={epics}
-                sprints={allSprints}
-                onClick={() => onTaskClick(task)}
-                onUpdate={onTaskUpdate}
-                isActive={selectedTaskId === task.id}
-                isSelected={selectedTaskIds.has(task.id)}
-                showCheckbox={selectedTaskIds.size > 0}
-                onSelectToggle={onTaskSelectToggle}
-              />
-            ))}
+            {groupedTasks ? (
+              groupedTasks.map((group) => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/30 border-b">
+                    <span className={cn("text-xs font-semibold uppercase tracking-wide", group.color)}>
+                      {group.label}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                      {group.tasks.length}
+                    </Badge>
+                  </div>
+                  {group.tasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      users={users}
+                      epics={epics}
+                      sprints={allSprints}
+                      onClick={() => onTaskClick(task)}
+                      onUpdate={onTaskUpdate}
+                      isActive={selectedTaskId === task.id}
+                      isSelected={selectedTaskIds.has(task.id)}
+                      showCheckbox={selectedTaskIds.size > 0}
+                      onSelectToggle={onTaskSelectToggle}
+                    />
+                  ))}
+                </div>
+              ))
+            ) : (
+              sortedTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  users={users}
+                  epics={epics}
+                  sprints={allSprints}
+                  onClick={() => onTaskClick(task)}
+                  onUpdate={onTaskUpdate}
+                  isActive={selectedTaskId === task.id}
+                  isSelected={selectedTaskIds.has(task.id)}
+                  showCheckbox={selectedTaskIds.size > 0}
+                  onSelectToggle={onTaskSelectToggle}
+                />
+              ))
+            )}
           </SortableContext>
 
           {/* Inline task creation */}
