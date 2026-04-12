@@ -94,7 +94,7 @@ export function SprintSection({
     'DONE': 'Done',
     'LIVE': 'Live',
   }
-  const statusOrder = ['TODO', 'IN_PROGRESS', 'READY_TO_TEST', 'BLOCKED', 'DONE', 'LIVE']
+  const statusOrder = ['LIVE', 'DONE', 'READY_TO_TEST', 'IN_PROGRESS', 'TODO', 'BLOCKED']
   const statusColors: Record<string, string> = {
     'TODO': 'text-muted-foreground',
     'IN_PROGRESS': 'text-blue-600 dark:text-blue-400',
