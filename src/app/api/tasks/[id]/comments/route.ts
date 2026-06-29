@@ -90,10 +90,15 @@ export async function POST(
     }
 
     // If this is a reply, validate the parent exists and belongs to this task
+    let parentAuthor: { id: string; email: string; name: string } | null = null
     if (parentId) {
       const parent = await prisma.comment.findUnique({
         where: { id: parentId },
-        select: { id: true, taskId: true },
+        select: {
+          id: true,
+          taskId: true,
+          author: { select: { id: true, email: true, name: true } },
+        },
       })
 
       if (!parent) {
@@ -106,6 +111,8 @@ export async function POST(
           { status: 400 }
         )
       }
+
+      parentAuthor = parent.author
     }
 
     const comment = await prisma.comment.create({
@@ -224,6 +231,24 @@ export async function POST(
         commentContent: content,
         taskUrl,
       })
+    }
+
+    // Notify the parent comment's author when this is a reply (email + in-app),
+    // unless they're the replier or were already notified via mention/assignee/creator.
+    if (parentAuthor && parentAuthor.email && !notifiedUserIds.has(parentAuthor.id)) {
+      await prisma.notification.create({
+        data: { type: 'MENTION', userId: parentAuthor.id, taskId, commentId: comment.id },
+      })
+      sendCommentNotificationEmail({
+        recipientEmail: parentAuthor.email,
+        recipientName: parentAuthor.name,
+        commenterName: user.name,
+        taskKey: task.taskKey || 'TASK',
+        taskTitle: task.title,
+        commentContent: content,
+        taskUrl,
+      })
+      notifiedUserIds.add(parentAuthor.id)
     }
 
     // Broadcast the new comment to everyone viewing the project

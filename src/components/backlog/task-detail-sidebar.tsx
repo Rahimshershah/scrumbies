@@ -709,6 +709,14 @@ export function TaskDetailSidebar({
 
   return (
     <>
+      {/* Blurred backdrop behind the bottom sheet (full view only). Click to close. */}
+      {layoutMode === 'bottom' && (
+        <div
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
       <div
         ref={sidebarRef}
         className={cn(

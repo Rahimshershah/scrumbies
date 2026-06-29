@@ -14,7 +14,8 @@ import Gapcursor from '@tiptap/extension-gapcursor'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import Mention from '@tiptap/extension-mention'
-import Image from '@tiptap/extension-image'
+import { ResizableImage } from './resizable-image'
+import { compressImage } from '@/lib/image-utils'
 import { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
 import { cn, normalizeAvatarUrl } from '@/lib/utils'
@@ -352,6 +353,7 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const editorRef = useRef<Editor | null>(null)
   const onImageUploadRef = useRef(onImageUpload)
@@ -363,11 +365,20 @@ export function RichTextEditor({
     const uploader = onImageUploadRef.current
     const ed = editorRef.current
     if (!uploader || !ed || !file.type.startsWith('image/')) return
+    setUploadingImage(true)
     try {
-      const url = await uploader(file)
+      // Compress/downscale client-side to keep the image under 1 MB.
+      const { file: compressed, tooLarge } = await compressImage(file)
+      if (tooLarge) {
+        alert('That image is too large even after compression. Please use an image under 1 MB (crop it or lower the resolution).')
+        return
+      }
+      const url = await uploader(compressed)
       if (url) ed.chain().focus().setImage({ src: url }).run()
     } catch (err) {
       console.error('Image upload failed:', err)
+    } finally {
+      setUploadingImage(false)
     }
   }, [])
 
@@ -480,7 +491,7 @@ export function RichTextEditor({
       }),
       ...(enableImages
         ? [
-            Image.configure({
+            ResizableImage.configure({
               inline: false,
               allowBase64: false,
               HTMLAttributes: { class: 'rounded-md max-w-full my-2 border' },
@@ -621,6 +632,14 @@ export function RichTextEditor({
           }}
         />
       )}
+      {uploadingImage && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground border-b bg-muted/30">
+          <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Compressing &amp; uploading image…
+        </div>
+      )}
       <EditorContent editor={editor} />
     </div>
   )
@@ -664,7 +683,7 @@ export function RichTextDisplay({ content, className }: { content: string; class
           class: 'mention bg-primary/10 text-primary px-1 py-0.5 rounded font-medium',
         },
       }),
-      Image.configure({
+      ResizableImage.configure({
         HTMLAttributes: { class: 'rounded-md max-w-full my-2 border' },
       }),
     ],
