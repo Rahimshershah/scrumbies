@@ -28,6 +28,26 @@ const dev = process.env.NODE_ENV !== 'production'
 const port = parseInt(process.env.PORT || '3000', 10)
 const hostname = process.env.HOSTNAME || undefined
 
+// ---------------------------------------------------------------------------
+// Crash guards.
+//
+// Node terminates the process by default on an uncaught exception or an
+// unhandled promise rejection (the latter since Node 15). Under PM2 that means
+// the server dies, PM2 restarts it, and during the ~1-2s restart window nginx
+// has no upstream to talk to and returns 502 Bad Gateway to every user.
+//
+// A web server should not die because of one bad request. We log the error
+// loudly (so it still shows in `pm2 logs`) and keep the process alive. The
+// in-flight request that triggered it has already failed/returned on its own;
+// other connections are unaffected.
+// ---------------------------------------------------------------------------
+process.on('uncaughtException', (err) => {
+  console.error('[server] uncaughtException — keeping process alive:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] unhandledRejection — keeping process alive:', reason)
+})
+
 const app = next({ dev })
 const handle = app.getRequestHandler()
 

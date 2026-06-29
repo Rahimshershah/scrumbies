@@ -1,4 +1,7 @@
-export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'READY_TO_TEST' | 'BLOCKED' | 'DONE' | 'LIVE'
+// Built-in statuses plus any custom per-project status key (ProjectStatus.key).
+// The `(string & {})` keeps editor autocomplete for the built-ins while allowing
+// arbitrary custom keys like 'REVISE'.
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'READY_TO_TEST' | 'BLOCKED' | 'DONE' | 'LIVE' | (string & {})
 export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'UAT' | 'COMPLETED'
 export type Role = 'ADMIN' | 'MEMBER'
 export type Team = string // Dynamic - references ProjectTeam.key

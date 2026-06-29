@@ -132,6 +132,16 @@ function SortableTaskRow({
         }
       }}
       onClick={(e) => {
+        // Inline edits (status/team/epic/priority/assignee dropdowns, buttons,
+        // and the menu items they portal out) are quick updates — they must NOT
+        // open the detail panel. Bail if the click started on any interactive
+        // control. This is belt-and-suspenders on top of the stopPropagation in
+        // each dropdown wrapper, and also covers Radix menu items that render in
+        // a portal and can otherwise leak a click back to the row.
+        const target = e.target as HTMLElement
+        if (target.closest('button, a, input, [role="menu"], [role="menuitem"], [data-radix-popper-content-wrapper]')) {
+          return
+        }
         // Regular click opens task details (but not if shift was held)
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !isDragging) {
           onClick()

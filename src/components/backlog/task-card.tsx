@@ -462,9 +462,9 @@ export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, 
       )}
 
       {/* Status dropdown - always visible, fixed width */}
-      <div className="w-20 sm:w-24 md:w-28">
+      <div className="w-20 sm:w-24 md:w-28" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuTrigger asChild>
             <button
               className={cn("w-full px-2 py-1 rounded", getTextSize('xs'), "font-semibold uppercase tracking-wide transition-colors text-center")}
               style={{ backgroundColor: status.bgColor, color: status.color }}
@@ -504,9 +504,9 @@ export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, 
       </div>
 
       {/* Priority dropdown */}
-      <div className="w-8 sm:w-10">
+      <div className="w-8 sm:w-10" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuTrigger asChild>
             <button
               className={cn(
                 "w-full flex items-center justify-center rounded font-bold transition-colors",
@@ -551,9 +551,9 @@ export function TaskCard({ task, users = [], epics = [], sprints = [], onClick, 
       </div>
 
       {/* Assignee dropdown */}
-      <div style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }}>
+      <div style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }} onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuTrigger asChild>
             {task.assignee ? (
               <Avatar className={cn("cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all")} style={{ width: `${7 * getScale() * 0.25}rem`, height: `${7 * getScale() * 0.25}rem` }}>
                 {task.assignee.avatarUrl ? (

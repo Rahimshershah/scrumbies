@@ -19,14 +19,11 @@ enum SprintStatus {
   COMPLETED
 }
 
-enum TaskStatus {
-  TODO
-  IN_PROGRESS
-  READY_TO_TEST
-  BLOCKED
-  DONE
-  LIVE
-}
+// Task status is stored as a free-form string (not a DB enum) so that custom
+// per-project statuses defined in ProjectStatus can actually be applied to tasks.
+// The values below are the built-in defaults; projects may add their own (e.g.
+// "REVISE") via Admin Settings > Project > Statuses.
+//   TODO | IN_PROGRESS | READY_TO_TEST | BLOCKED | DONE | LIVE | <custom keys>
 
 enum NotificationType {
   MENTION
@@ -237,7 +234,7 @@ model Task {
   taskNumber  Int?       // The numeric part of the key
   title       String
   description String?    @db.Text
-  status      TaskStatus @default(TODO)
+  status      String     @default("TODO")
   priority    Priority   @default(MEDIUM)
   order       Int        @default(0)
   team        String?    // References ProjectTeam.key
@@ -281,7 +278,7 @@ model Comment {
   updatedAt DateTime @updatedAt
 
   // Context - what phase the task was in when comment was made
-  taskStatusAtCreation TaskStatus?
+  taskStatusAtCreation String?
 
   // Resolution state
   resolved     Boolean   @default(false)
