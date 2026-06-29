@@ -707,6 +707,35 @@ export function TaskDetailSidebar({
   const assignee = users.find(u => u.id === assigneeId)
   const reporter = task.createdBy || (task.createdById ? users.find(u => u.id === task.createdById) : null) || { name: 'Unknown', avatarUrl: null }
 
+  // Description content — rendered in the details column in side mode, or moved into
+  // the wide comments (70%) column in the bottom full view.
+  const descriptionBlock = (
+    <>
+      <label className="text-sm font-semibold mb-2 block">Description</label>
+      <div className="overflow-x-auto max-w-full min-w-0 [&_table]:max-w-[calc(100%-1rem)] [&_.ProseMirror]:max-w-full">
+        {readOnly ? (
+          description ? (
+            <div className="max-w-full overflow-hidden">
+              <RichTextDisplay content={description} className="text-sm [&_.ProseMirror]:max-w-full" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">No description</p>
+          )
+        ) : (
+          <RichTextEditor
+            content={description}
+            onChange={setDescription}
+            onMentionsChange={setDescriptionMentions}
+            placeholder="Add a description... (type @ to mention someone)"
+            minHeight="80px"
+            minimal
+            users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
+          />
+        )}
+      </div>
+    </>
+  )
+
   return (
     <>
       {/* Blurred backdrop behind the bottom sheet (full view only). Click to close. */}
@@ -1058,31 +1087,13 @@ export function TaskDetailSidebar({
                 </div>
               )}
 
-              {/* Description */}
-              <div className="border-t pt-4 min-w-0">
-                <label className="text-sm font-semibold mb-2 block">Description</label>
-                <div className="overflow-x-auto max-w-full min-w-0 [&_table]:max-w-[calc(100%-1rem)] [&_.ProseMirror]:max-w-full">
-                  {readOnly ? (
-                    description ? (
-                      <div className="max-w-full overflow-hidden">
-                        <RichTextDisplay content={description} className="text-sm [&_.ProseMirror]:max-w-full" />
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No description</p>
-                    )
-                  ) : (
-                    <RichTextEditor
-                      content={description}
-                      onChange={setDescription}
-                      onMentionsChange={setDescriptionMentions}
-                      placeholder="Add a description... (type @ to mention someone)"
-                      minHeight="80px"
-                      minimal
-                      users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
-                    />
-                  )}
+              {/* Description — shown in the details column only in side mode; in the
+                  bottom full view it moves to the 70% comments column. */}
+              {layoutMode === 'side' && (
+                <div className="border-t pt-4 min-w-0">
+                  {descriptionBlock}
                 </div>
-              </div>
+              )}
 
               {/* Attachments */}
               <div className="border-t pt-4">
@@ -1194,6 +1205,12 @@ export function TaskDetailSidebar({
 
               {/* COMMENTS COLUMN — ~70% width in the bottom (full) view */}
               <div className={cn("min-w-0", layoutMode === 'bottom' && "lg:flex-1 lg:p-4")}>
+              {/* Description moves here in the bottom full view (top of the 70% column) */}
+              {layoutMode === 'bottom' && (
+                <div className="pb-4 mb-4 border-b min-w-0">
+                  {descriptionBlock}
+                </div>
+              )}
               {/* Comments & Activity Tabs */}
               <div className={cn(layoutMode === 'bottom' ? "lg:pt-0" : "border-t pt-4")}>
                 <Tabs defaultValue="comments" className="w-full">
