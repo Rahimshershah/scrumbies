@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { RichTextEditor, RichTextDisplay, MentionUser } from '@/components/ui/rich-text-editor'
 import { cn } from '@/lib/utils'
 import { useProjectSettings } from '@/contexts/project-settings-context'
@@ -785,19 +784,20 @@ export function TaskDetailSidebar({
               )}
               {/* Layout toggle: right drawer ⟷ bottom sheet (desktop only) */}
               <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 hidden md:inline-flex"
+                size="sm"
+                variant="outline"
+                className="h-8 hidden md:inline-flex items-center gap-1.5 text-xs"
                 onClick={toggleLayoutMode}
-                title={layoutMode === 'side' ? 'Expand to bottom panel (80% height)' : 'Dock to right side'}
+                title={layoutMode === 'side' ? 'Expand to a bottom panel (80% height)' : 'Dock to the right side'}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {layoutMode === 'side' ? (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   ) : (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   )}
                 </svg>
+                {layoutMode === 'side' ? 'Switch to Bottom' : 'Switch to Side'}
               </Button>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onClose}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -807,10 +807,11 @@ export function TaskDetailSidebar({
             </div>
           </div>
 
-          <ScrollArea className="flex-1 w-full">
-            <div className={cn("p-4 max-w-full overflow-x-hidden", layoutMode === 'bottom' ? "lg:flex lg:gap-0 lg:p-0 lg:items-start" : "space-y-4")}>
-              {/* DETAILS COLUMN — ~30% width in the bottom (full) view */}
-              <div className={cn("space-y-4 min-w-0", layoutMode === 'bottom' && "lg:w-[30%] lg:min-w-[300px] lg:max-w-[460px] lg:shrink-0 lg:p-4 lg:border-r lg:self-stretch")}>
+          <div className="flex-1 w-full overflow-y-auto overflow-x-hidden">
+            <div className={cn("p-4 max-w-full", layoutMode === 'bottom' ? "lg:flex lg:gap-0 lg:p-0 lg:items-start" : "space-y-4 overflow-x-hidden")}>
+              {/* DETAILS COLUMN — ~30% width in the bottom (full) view; sticks while the
+                  right (comments) column scrolls. */}
+              <div className={cn("space-y-4 min-w-0", layoutMode === 'bottom' && "lg:w-[30%] lg:min-w-[300px] lg:max-w-[460px] lg:shrink-0 lg:p-4 lg:border-r lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(80vh-3.25rem)] lg:overflow-y-auto")}>
               {/* Title */}
               <div>
                 {readOnly ? (
@@ -1489,7 +1490,7 @@ export function TaskDetailSidebar({
               </div>
               {/* end COMMENTS COLUMN */}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </div>
 
