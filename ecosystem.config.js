@@ -18,6 +18,11 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
+        // Pin the uploads dir. Without this, getUploadsDir() in src/lib/utils.ts
+        // sees this custom server.js and misfires into "standalone mode" → writes
+        // to /var/www/uploads (root-owned, unwritable) and every upload 500s.
+        // Point it at the existing writable public/uploads where files already live.
+        UPLOADS_DIR: '/var/www/scrumbies/public/uploads',
       },
     },
   ],

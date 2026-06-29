@@ -116,6 +116,11 @@ export function TaskDetailSidebar({
   const commentFileInputRef = useRef<HTMLInputElement>(null)
   // Layout mode for the panel: side drawer (default) or bottom sheet (~80% height)
   const [layoutMode, setLayoutMode] = useState<'side' | 'bottom'>('side')
+  // Threaded replies
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [replyMentions, setReplyMentions] = useState<string[]>([])
+  const [submittingReply, setSubmittingReply] = useState(false)
   const [descriptionMentions, setDescriptionMentions] = useState<string[]>([])
   const [loadingActivity, setLoadingActivity] = useState(true)
   const [taskChain, setTaskChain] = useState<TaskChain | null>(null)
@@ -429,6 +434,31 @@ export function TaskDetailSidebar({
     }
   }
 
+  async function handleAddReply(parentId: string) {
+    if (submittingReply) return
+    const hasText = !!replyText.trim() && replyText !== '<p></p>'
+    if (!hasText) return
+    setSubmittingReply(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: replyText, mentionIds: replyMentions, parentId }),
+      })
+      if (!res.ok) throw new Error('Failed to reply')
+      const reply = await res.json()
+      setComments(prev => (prev.some(c => c.id === reply.id) ? prev : [...prev, reply]))
+      setReplyingTo(null)
+      setReplyText('')
+      setReplyMentions([])
+    } catch (error) {
+      console.error('Failed to add reply:', error)
+      alert('Failed to add reply. Please try again.')
+    } finally {
+      setSubmittingReply(false)
+    }
+  }
+
   async function handleToggleResolve(comment: Comment) {
     setResolvingId(comment.id)
     try {
@@ -652,6 +682,17 @@ export function TaskDetailSidebar({
     }
   }
 
+  // Threading: top-level comments (newest first) and their replies grouped by parent.
+  const topLevelComments = [...comments]
+    .filter(c => !c.parentId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const repliesByParent = comments.reduce((acc, c) => {
+    if (c.parentId) {
+      ;(acc[c.parentId] = acc[c.parentId] || []).push(c)
+    }
+    return acc
+  }, {} as Record<string, Comment[]>)
+
   const hasChanges =
     title !== task.title ||
     description !== (task.description || '') ||
@@ -730,7 +771,9 @@ export function TaskDetailSidebar({
           </div>
 
           <ScrollArea className="flex-1 w-full">
-            <div className="p-4 space-y-4 max-w-full overflow-x-hidden">
+            <div className={cn("p-4 max-w-full overflow-x-hidden", layoutMode === 'bottom' ? "lg:flex lg:gap-0 lg:p-0 lg:items-start" : "space-y-4")}>
+              {/* DETAILS COLUMN — ~30% width in the bottom (full) view */}
+              <div className={cn("space-y-4 min-w-0", layoutMode === 'bottom' && "lg:w-[30%] lg:min-w-[300px] lg:max-w-[460px] lg:shrink-0 lg:p-4 lg:border-r lg:self-stretch")}>
               {/* Title */}
               <div>
                 {readOnly ? (
@@ -1138,8 +1181,13 @@ export function TaskDetailSidebar({
                 </div>
               )}
 
+              </div>
+              {/* end DETAILS COLUMN */}
+
+              {/* COMMENTS COLUMN — ~70% width in the bottom (full) view */}
+              <div className={cn("min-w-0", layoutMode === 'bottom' && "lg:flex-1 lg:p-4")}>
               {/* Comments & Activity Tabs */}
-              <div className="border-t pt-4">
+              <div className={cn(layoutMode === 'bottom' ? "lg:pt-0" : "border-t pt-4")}>
                 <Tabs defaultValue="comments" className="w-full">
                   <TabsList className="w-full grid grid-cols-2 h-9">
                     <TabsTrigger value="comments" className="text-sm">
@@ -1208,8 +1256,8 @@ export function TaskDetailSidebar({
                       </div>
                     )}
 
-                    {/* Comments list - newest first (two columns in the wide bottom view) */}
-                    <div className={cn("space-y-4", layoutMode === 'bottom' && "lg:columns-2 lg:gap-6 lg:space-y-0 [&>*]:mb-4 [&>*]:break-inside-avoid")}>
+                    {/* Comments list - newest first */}
+                    <div className="space-y-4">
                       {loadingComments ? (
                         <div className="flex items-center justify-center py-4">
                           <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1220,12 +1268,14 @@ export function TaskDetailSidebar({
                       ) : comments.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">No comments yet</p>
                       ) : (
-                        [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((comment) => {
+                        topLevelComments.map((comment) => {
                           const isTestingComment = comment.taskStatusAtCreation === 'READY_TO_TEST'
                           const isBlockedComment = comment.taskStatusAtCreation === 'BLOCKED'
                           const isResolved = !!comment.resolved
+                          const replies = (repliesByParent[comment.id] || []).slice().sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
                           return (
-                            <div key={comment.id} className={cn("flex gap-3 group", isResolved && "opacity-60")}>
+                            <div key={comment.id} className="space-y-2">
+                            <div className={cn("flex gap-3 group", isResolved && "opacity-60")}>
                               <Avatar className="w-7 h-7 flex-shrink-0">
                                 {comment.author.avatarUrl ? (
                                   <AvatarImage src={comment.author.avatarUrl} />
@@ -1302,6 +1352,81 @@ export function TaskDetailSidebar({
                                 )}
                               </div>
                             </div>
+                            {/* Replies (one level deep) */}
+                            {replies.map((reply) => (
+                              <div key={reply.id} className={cn("flex gap-2 group ml-10 pl-3 border-l-2 border-muted", reply.resolved && "opacity-60")}>
+                                <Avatar className="w-6 h-6 flex-shrink-0">
+                                  {reply.author.avatarUrl ? <AvatarImage src={reply.author.avatarUrl} /> : null}
+                                  <AvatarFallback className="text-[9px] bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                                    {reply.author.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                    <span className="text-xs font-semibold">{reply.author.name}</span>
+                                    <span className="text-[10px] text-muted-foreground">{formatRelativeTime(reply.createdAt)}</span>
+                                    {currentUserId === reply.author.id && !readOnly && (
+                                      <Button variant="ghost" size="sm" className="h-4 px-1 ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteComment(reply.id)}>
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="text-sm overflow-hidden break-words"><RichTextDisplay content={reply.content} /></div>
+                                  {reply.attachments && reply.attachments.length > 0 && (
+                                    <div className="mt-1.5 flex flex-wrap gap-2">
+                                      {reply.attachments.map((att) => (
+                                        att.mimeType.startsWith('image/') ? (
+                                          <button key={att.id} onClick={() => handleAttachmentClick(att)} className="block" title={att.filename}>
+                                            <img src={att.url} alt={att.filename} className="h-16 w-16 object-cover rounded border hover:opacity-80" />
+                                          </button>
+                                        ) : (
+                                          <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 bg-muted/50 rounded px-2 py-1 text-xs hover:bg-muted max-w-[200px]">
+                                            <span>{getFileIcon(att.mimeType)}</span>
+                                            <span className="truncate">{att.filename}</span>
+                                          </a>
+                                        )
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            {/* Reply affordance */}
+                            {!readOnly && (
+                              <div className="ml-10">
+                                {replyingTo === comment.id ? (
+                                  <div className="space-y-2">
+                                    <RichTextEditor
+                                      content={replyText}
+                                      onChange={setReplyText}
+                                      onMentionsChange={setReplyMentions}
+                                      placeholder="Write a reply... (@ to mention, paste an image)"
+                                      minHeight="48px"
+                                      minimal
+                                      users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
+                                      enableImages
+                                      onImageUpload={uploadInlineImage}
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                      <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText(''); setReplyMentions([]) }}>Cancel</Button>
+                                      <Button size="sm" onClick={() => handleAddReply(comment.id)} disabled={submittingReply || !(replyText.trim() && replyText !== '<p></p>')}>
+                                        {submittingReply ? 'Replying...' : 'Reply'}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    className="text-xs text-muted-foreground hover:text-primary font-medium"
+                                    onClick={() => { setReplyingTo(comment.id); setReplyText(''); setReplyMentions([]) }}
+                                  >
+                                    Reply{replies.length > 0 ? ` (${replies.length})` : ''}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            </div>
                           )
                         })
                       )}
@@ -1336,6 +1461,8 @@ export function TaskDetailSidebar({
                   </TabsContent>
                 </Tabs>
               </div>
+              </div>
+              {/* end COMMENTS COLUMN */}
             </div>
           </ScrollArea>
         </div>

@@ -536,8 +536,21 @@ export function RichTextEditor({
       },
       handlePaste: (_view, event) => {
         if (!enableImages || !onImageUploadRef.current) return false
-        const files = event.clipboardData?.files
-        const images = files ? Array.from(files).filter((f) => f.type.startsWith('image/')) : []
+        const dt = event.clipboardData
+        // Pasted screenshots arrive via files in some browsers and via items
+        // (DataTransferItem kind="file") in others — collect from both.
+        const fromFiles = dt?.files ? Array.from(dt.files) : []
+        const fromItems = dt?.items
+          ? Array.from(dt.items).filter((it) => it.kind === 'file').map((it) => it.getAsFile()).filter(Boolean) as File[]
+          : []
+        const seen = new Set<string>()
+        const images = [...fromFiles, ...fromItems].filter((f) => {
+          if (!f.type.startsWith('image/')) return false
+          const key = `${f.name}:${f.size}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
         if (images.length === 0) return false
         event.preventDefault()
         images.forEach((f) => uploadAndInsertImage(f))

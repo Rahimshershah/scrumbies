@@ -298,7 +298,13 @@ model Comment {
   notifications Notification[]
   attachments CommentAttachment[]
 
+  // Threaded replies (self-relation)
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+
   @@index([taskId])
+  @@index([parentId])
 }
 
 model CommentAttachment {

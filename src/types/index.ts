@@ -92,6 +92,8 @@ export interface Comment {
   resolvedAt?: string | null
   resolvedBy?: User | null
   attachments?: Attachment[] // CommentAttachment records share the Attachment shape
+  parentId?: string | null // Threaded reply: id of the comment this one replies to
+  replies?: Comment[] // Optional nested replies when the API returns a tree
 }
 
 export interface Attachment {

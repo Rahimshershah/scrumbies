@@ -64,7 +64,7 @@ export async function POST(
     const { id: taskId } = await params
 
     const body = await request.json()
-    const { content, mentionIds, attachmentIds } = body
+    const { content, mentionIds, attachmentIds, parentId } = body
 
     if (!content) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
@@ -89,12 +89,32 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
+    // If this is a reply, validate the parent exists and belongs to this task
+    if (parentId) {
+      const parent = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { id: true, taskId: true },
+      })
+
+      if (!parent) {
+        return NextResponse.json({ error: 'Parent comment not found' }, { status: 404 })
+      }
+
+      if (parent.taskId !== taskId) {
+        return NextResponse.json(
+          { error: 'Parent comment does not belong to this task' },
+          { status: 400 }
+        )
+      }
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content,
         taskId,
         authorId: user.id,
         taskStatusAtCreation: task.status, // Store what phase the task was in
+        parentId: parentId ?? null, // Threaded reply link (null for top-level comments)
         mentions: mentionIds?.length
           ? { connect: mentionIds.map((id: string) => ({ id })) }
           : undefined,
