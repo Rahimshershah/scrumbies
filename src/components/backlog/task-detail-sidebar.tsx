@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { RichTextEditor, RichTextDisplay, MentionUser } from '@/components/ui/rich-text-editor'
 import { cn } from '@/lib/utils'
 import { useProjectSettings } from '@/contexts/project-settings-context'
+import { useSocket } from '@/contexts/socket-context'
 import {
   Select,
   SelectContent,
@@ -89,6 +90,7 @@ export function TaskDetailSidebar({
   // Permission check: only admin or task creator can delete
   const canDelete = currentUserRole === 'ADMIN' || task.createdById === currentUserId
   const { statuses, teams, getStatusConfig, getTeamConfig } = useProjectSettings()
+  const { subscribe } = useSocket()
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
   const [status, setStatus] = useState<TaskStatus>(task.status)
@@ -108,6 +110,12 @@ export function TaskDetailSidebar({
   const [loadingComments, setLoadingComments] = useState(true)
   const [newComment, setNewComment] = useState('')
   const [commentMentions, setCommentMentions] = useState<string[]>([])
+  const [pendingCommentFiles, setPendingCommentFiles] = useState<File[]>([])
+  const [submittingComment, setSubmittingComment] = useState(false)
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
+  const commentFileInputRef = useRef<HTMLInputElement>(null)
+  // Layout mode for the panel: side drawer (default) or bottom sheet (~80% height)
+  const [layoutMode, setLayoutMode] = useState<'side' | 'bottom'>('side')
   const [descriptionMentions, setDescriptionMentions] = useState<string[]>([])
   const [loadingActivity, setLoadingActivity] = useState(true)
   const [taskChain, setTaskChain] = useState<TaskChain | null>(null)
@@ -237,6 +245,33 @@ export function TaskDetailSidebar({
     }
   }, [task.id])
 
+  // Restore the panel layout preference once on mount.
+  useEffect(() => {
+    const saved = localStorage.getItem('scrumbies_task_panel_layout')
+    if (saved === 'bottom' || saved === 'side') setLayoutMode(saved)
+  }, [])
+
+  const toggleLayoutMode = useCallback(() => {
+    setLayoutMode(prev => {
+      const next = prev === 'side' ? 'bottom' : 'side'
+      localStorage.setItem('scrumbies_task_panel_layout', next)
+      return next
+    })
+  }, [])
+
+  // Real-time: live-update this task's comments when teammates add or resolve them.
+  useEffect(() => {
+    const unsubAdded = subscribe('comment:added', (p: any) => {
+      if (p?.taskId !== task.id || !p?.comment) return
+      setComments(prev => (prev.some(c => c.id === p.comment.id) ? prev : [...prev, p.comment]))
+    })
+    const unsubUpdated = subscribe('comment:updated', (p: any) => {
+      if (p?.taskId !== task.id || !p?.comment) return
+      setComments(prev => prev.map(c => (c.id === p.comment.id ? p.comment : c)))
+    })
+    return () => { unsubAdded(); unsubUpdated() }
+  }, [subscribe, task.id])
+
   // Resize handlers
   const startResizing = useCallback((e: React.MouseEvent) => {
     isResizing.current = true
@@ -338,24 +373,91 @@ export function TaskDetailSidebar({
     }
   }
 
+  // Upload an inline image (pasted/dropped/picked inside the comment editor) and
+  // return its URL so the editor can embed <img src>. Avoids huge base64 payloads.
+  const uploadInlineImage = useCallback(async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/uploads/inline-images', { method: 'POST', body: formData })
+      if (!res.ok) return null
+      const data = await res.json()
+      return data.url || null
+    } catch {
+      return null
+    }
+  }, [])
+
   async function handleAddComment() {
-    if (!newComment.trim() || newComment === '<p></p>') return
+    if (submittingComment) return
+    const hasText = !!newComment.trim() && newComment !== '<p></p>'
+    if (!hasText && pendingCommentFiles.length === 0) return
+    setSubmittingComment(true)
     try {
       const res = await fetch(`/api/tasks/${task.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          content: newComment,
+        body: JSON.stringify({
+          content: hasText ? newComment : '',
           mentionIds: commentMentions,
         }),
       })
-      const comment = await res.json()
-      setComments((prev) => [...prev, comment])
+      if (!res.ok) throw new Error('Failed to create comment')
+      let comment = await res.json()
+      // Upload any picked attachments to the freshly-created comment.
+      if (pendingCommentFiles.length > 0) {
+        const uploaded: Attachment[] = []
+        for (const file of pendingCommentFiles) {
+          const fd = new FormData()
+          fd.append('file', file)
+          const ar = await fetch(`/api/comments/${comment.id}/attachments`, { method: 'POST', body: fd })
+          if (ar.ok) uploaded.push(await ar.json())
+        }
+        comment = { ...comment, attachments: [...(comment.attachments || []), ...uploaded] }
+      }
+      setComments(prev =>
+        prev.some(c => c.id === comment.id) ? prev.map(c => (c.id === comment.id ? comment : c)) : [...prev, comment]
+      )
       setNewComment('')
       setCommentMentions([])
+      setPendingCommentFiles([])
     } catch (error) {
       console.error('Failed to add comment:', error)
+      alert('Failed to add comment. Please try again.')
+    } finally {
+      setSubmittingComment(false)
     }
+  }
+
+  async function handleToggleResolve(comment: Comment) {
+    setResolvingId(comment.id)
+    try {
+      const res = await fetch(`/api/comments/${comment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved: !comment.resolved }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setComments(prev => prev.map(c => (c.id === comment.id ? updated : c)))
+      }
+    } catch (error) {
+      console.error('Failed to toggle resolve:', error)
+    } finally {
+      setResolvingId(null)
+    }
+  }
+
+  function handleCommentFilesPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    const tooBig = files.find(f => f.size > 25 * 1024 * 1024)
+    if (tooBig) {
+      alert('Each file must be 25MB or smaller.')
+      e.target.value = ''
+      return
+    }
+    setPendingCommentFiles(prev => [...prev, ...files])
+    e.target.value = ''
   }
 
   async function handleDeleteComment(commentId: string) {
@@ -568,14 +670,21 @@ export function TaskDetailSidebar({
     <>
       <div
         ref={sidebarRef}
-        className="h-full bg-background border-l flex flex-shrink-0 relative fixed md:relative inset-0 md:inset-auto z-50 md:z-auto"
-        style={{ width: sidebarWidth, maxWidth: '100vw' }}
+        className={cn(
+          "bg-background flex flex-shrink-0 relative z-50",
+          layoutMode === 'bottom'
+            ? "fixed inset-x-0 bottom-0 h-[80vh] w-full border-t shadow-2xl"
+            : "h-full border-l fixed md:relative inset-0 md:inset-auto md:z-auto"
+        )}
+        style={layoutMode === 'bottom' ? { maxWidth: '100vw' } : { width: sidebarWidth, maxWidth: '100vw' }}
       >
-        {/* Resize handle - hidden on mobile */}
-        <div
-          className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10 -ml-0.5"
-          onMouseDown={startResizing}
-        />
+        {/* Resize handle - side mode only, hidden on mobile */}
+        {layoutMode === 'side' && (
+          <div
+            className="hidden md:block absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary transition-colors z-10 -ml-0.5"
+            onMouseDown={startResizing}
+          />
+        )}
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
@@ -596,6 +705,22 @@ export function TaskDetailSidebar({
                   {saving ? 'Saving...' : 'Save'}
                 </Button>
               )}
+              {/* Layout toggle: right drawer ⟷ bottom sheet (desktop only) */}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 hidden md:inline-flex"
+                onClick={toggleLayoutMode}
+                title={layoutMode === 'side' ? 'Expand to bottom panel (80% height)' : 'Dock to right side'}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {layoutMode === 'side' ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  )}
+                </svg>
+              </Button>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onClose}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1034,21 +1159,57 @@ export function TaskDetailSidebar({
                           content={newComment}
                           onChange={setNewComment}
                           onMentionsChange={setCommentMentions}
-                          placeholder="Add a comment... (type @ to mention someone)"
+                          placeholder="Add a comment... (@ to mention, paste or drop an image)"
                           minHeight="60px"
                           minimal
                           users={users.map(u => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl }))}
+                          enableImages
+                          onImageUpload={uploadInlineImage}
                         />
-                        <div className="flex justify-end pr-1">
-                          <Button size="sm" className="flex-shrink-0" onClick={handleAddComment} disabled={!newComment.trim() || newComment === '<p></p>'}>
-                            Comment
+                        {/* Pending attachment chips */}
+                        {pendingCommentFiles.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {pendingCommentFiles.map((file, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1 bg-muted rounded px-2 py-1 text-xs max-w-[220px]">
+                                <span className="truncate">{file.name}</span>
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground hover:text-destructive leading-none"
+                                  onClick={() => setPendingCommentFiles(prev => prev.filter((_, i) => i !== idx))}
+                                  title="Remove"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2 pr-1">
+                          <input
+                            type="file"
+                            multiple
+                            ref={commentFileInputRef}
+                            onChange={handleCommentFilesPicked}
+                            className="hidden"
+                            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                          />
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => commentFileInputRef.current?.click()} disabled={submittingComment}>
+                            📎 Attach
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-shrink-0"
+                            onClick={handleAddComment}
+                            disabled={submittingComment || (!(newComment.trim() && newComment !== '<p></p>') && pendingCommentFiles.length === 0)}
+                          >
+                            {submittingComment ? 'Posting...' : 'Comment'}
                           </Button>
                         </div>
                       </div>
                     )}
 
-                    {/* Comments list - newest first */}
-                    <div className="space-y-4">
+                    {/* Comments list - newest first (two columns in the wide bottom view) */}
+                    <div className={cn("space-y-4", layoutMode === 'bottom' && "lg:columns-2 lg:gap-6 lg:space-y-0 [&>*]:mb-4 [&>*]:break-inside-avoid")}>
                       {loadingComments ? (
                         <div className="flex items-center justify-center py-4">
                           <svg className="w-5 h-5 animate-spin text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1062,8 +1223,9 @@ export function TaskDetailSidebar({
                         [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((comment) => {
                           const isTestingComment = comment.taskStatusAtCreation === 'READY_TO_TEST'
                           const isBlockedComment = comment.taskStatusAtCreation === 'BLOCKED'
+                          const isResolved = !!comment.resolved
                           return (
-                            <div key={comment.id} className="flex gap-3 group">
+                            <div key={comment.id} className={cn("flex gap-3 group", isResolved && "opacity-60")}>
                               <Avatar className="w-7 h-7 flex-shrink-0">
                                 {comment.author.avatarUrl ? (
                                   <AvatarImage src={comment.author.avatarUrl} />
@@ -1085,16 +1247,59 @@ export function TaskDetailSidebar({
                                       🚫 Blocked
                                     </Badge>
                                   )}
-                                  <span className="text-xs text-muted-foreground">{formatRelativeTime(comment.createdAt)}</span>
-                                  {currentUserId === comment.author.id && !readOnly && (
-                                    <Button variant="ghost" size="sm" className="h-5 px-1.5 ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteComment(comment.id)}>
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </Button>
+                                  {isResolved && (
+                                    <Badge variant="outline" className="h-4 text-[9px] px-1.5 bg-green-100 text-green-700 border-green-300">
+                                      ✓ Resolved{comment.resolvedBy?.name ? ` · ${comment.resolvedBy.name}` : ''}
+                                    </Badge>
                                   )}
+                                  <span className="text-xs text-muted-foreground">{formatRelativeTime(comment.createdAt)}</span>
+                                  <div className="ml-auto flex items-center gap-0.5">
+                                    {!readOnly && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className={cn(
+                                          "h-5 px-1.5 transition-opacity",
+                                          isResolved ? "text-green-600 opacity-100" : "text-muted-foreground hover:text-green-600 opacity-0 group-hover:opacity-100"
+                                        )}
+                                        onClick={() => handleToggleResolve(comment)}
+                                        disabled={resolvingId === comment.id}
+                                        title={isResolved ? 'Mark as unresolved' : 'Mark as resolved'}
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      </Button>
+                                    )}
+                                    {currentUserId === comment.author.id && !readOnly && (
+                                      <Button variant="ghost" size="sm" className="h-5 px-1.5 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteComment(comment.id)}>
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="text-sm overflow-hidden"><RichTextDisplay content={comment.content} /></div>
+                                <div className={cn("text-sm overflow-hidden break-words", isResolved && "line-through decoration-1")}>
+                                  <RichTextDisplay content={comment.content} />
+                                </div>
+                                {/* Comment attachments */}
+                                {comment.attachments && comment.attachments.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {comment.attachments.map((att) => (
+                                      att.mimeType.startsWith('image/') ? (
+                                        <button key={att.id} onClick={() => handleAttachmentClick(att)} className="block" title={att.filename}>
+                                          <img src={att.url} alt={att.filename} className="h-20 w-20 object-cover rounded border hover:opacity-80 transition-opacity" />
+                                        </button>
+                                      ) : (
+                                        <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 bg-muted/50 rounded px-2 py-1 text-xs hover:bg-muted max-w-[220px]">
+                                          <span>{getFileIcon(att.mimeType)}</span>
+                                          <span className="truncate">{att.filename}</span>
+                                        </a>
+                                      )
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )

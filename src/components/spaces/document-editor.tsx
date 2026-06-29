@@ -16,10 +16,10 @@ import { TaskItem } from '@tiptap/extension-task-item'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import dynamic from 'next/dynamic'
 import { DocumentComments } from './document-comments'
 import { DocumentAttachments } from './document-attachments'
 import { FileViewerPopup } from './file-viewer-popup'
-import { PDFViewer } from './pdf-viewer'
 import type { Document } from './spaces-view'
 import {
   Document as DocxDocument,
@@ -35,6 +35,13 @@ import {
   BorderStyle,
 } from 'docx'
 import { saveAs } from 'file-saver'
+
+// Load client-side only: react-pdf/pdfjs touch browser-only APIs (DOMMatrix)
+// at module load, which throws during SSR. ssr:false keeps it out of the server bundle.
+const PDFViewer = dynamic(
+  () => import('./pdf-viewer').then((m) => m.PDFViewer),
+  { ssr: false }
+)
 
 // Convert TipTap JSON to docx elements
 function tiptapToDocxElements(content: any): (Paragraph | DocxTable)[] {

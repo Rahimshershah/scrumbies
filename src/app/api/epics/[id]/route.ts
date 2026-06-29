@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
+import { emitToProject } from '@/lib/socket'
 
 // GET - Get a single epic with its tasks
 export async function GET(
@@ -92,6 +93,14 @@ export async function PATCH(
         },
       },
     })
+
+    // Broadcast the updated epic to everyone viewing the project
+    if (epic.projectId) {
+      emitToProject(epic.projectId, 'epic:updated', {
+        projectId: epic.projectId,
+        epic,
+      })
+    }
 
     return NextResponse.json(epic)
   } catch (error) {

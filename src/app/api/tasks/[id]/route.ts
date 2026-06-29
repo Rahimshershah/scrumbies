@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import { sendTaskAssignmentEmail } from '@/lib/email'
+import { emitToProject } from '@/lib/socket'
 
 export async function GET(
   request: NextRequest,
@@ -254,6 +255,14 @@ export async function PATCH(
       })
     }
 
+    // Broadcast the updated task to everyone viewing the project
+    if (task.projectId) {
+      emitToProject(task.projectId, 'task:updated', {
+        projectId: task.projectId,
+        task,
+      })
+    }
+
     return NextResponse.json(task)
   } catch (error) {
     if ((error as Error).message === 'Unauthorized') {
@@ -272,10 +281,10 @@ export async function DELETE(
     const user = await requireAuth()
     const { id } = await params
 
-    // Check if task exists and get creator
+    // Check if task exists and get creator + projectId (needed for realtime emit)
     const task = await prisma.task.findUnique({
       where: { id },
-      select: { createdById: true },
+      select: { createdById: true, projectId: true },
     })
 
     if (!task) {
@@ -293,6 +302,14 @@ export async function DELETE(
     await prisma.task.delete({
       where: { id },
     })
+
+    // Broadcast the deletion to everyone viewing the project
+    if (task.projectId) {
+      emitToProject(task.projectId, 'task:deleted', {
+        projectId: task.projectId,
+        taskId: id,
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

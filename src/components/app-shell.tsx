@@ -10,6 +10,7 @@ import { AppLayout } from '@/components/layout/app-layout'
 import { ProjectRequired } from '@/components/project-required'
 import { ProjectSettingsProvider } from '@/contexts/project-settings-context'
 import { RowHeightProvider } from '@/contexts/row-height-context'
+import { SocketProvider } from '@/contexts/socket-context'
 import { Project, Sprint, Task, Epic } from '@/types'
 
 export type AppView = 'backlog' | 'epics' | 'reports' | 'spaces'
@@ -174,21 +175,45 @@ export function AppShell({
   // Handle project change
   const handleProjectChange = useCallback(async (projectId: string) => {
     if (projectId === currentProjectId) return
-    
+
     setCurrentProjectId(projectId)
-    
+
     // Store in localStorage for persistence
     localStorage.setItem('scrumbies_current_project', projectId)
-    
+
+    // Reflect the current project in the URL so a reload restores the same project.
+    // Merge with existing params so view/task are preserved.
+    const newParams = new URLSearchParams(searchParams?.toString() || '')
+    newParams.set('projectId', projectId)
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
+
     // Fetch new project data
     await fetchProjectData(projectId)
-  }, [currentProjectId, fetchProjectData])
+  }, [currentProjectId, fetchProjectData, searchParams, router, pathname])
 
-  // Restore project from localStorage on mount
+  // Restore current project on mount.
+  // The URL is the source of truth: when it carries a valid ?projectId=, the server has
+  // already rendered that project, so we keep it (no switch, refetch, or flash). Only when
+  // the URL lacks a projectId do we fall back to the saved localStorage preference and
+  // reflect it into the URL so future reloads stay on the same project.
   useEffect(() => {
+    const urlProjectId = searchParams?.get('projectId')
+    if (urlProjectId && projects.some(p => p.id === urlProjectId)) {
+      // URL is authoritative and already server-rendered; just keep localStorage in sync.
+      localStorage.setItem('scrumbies_current_project', urlProjectId)
+      return
+    }
+
     const savedProjectId = localStorage.getItem('scrumbies_current_project')
     if (savedProjectId && projects.some(p => p.id === savedProjectId) && savedProjectId !== currentProjectId) {
+      // Switch to the saved project; handleProjectChange also writes ?projectId= to the URL.
       handleProjectChange(savedProjectId)
+    } else if (currentProjectId) {
+      // No (valid) saved preference: reflect the server-rendered project into the URL so
+      // subsequent reloads restore it without a refetch.
+      const newParams = new URLSearchParams(searchParams?.toString() || '')
+      newParams.set('projectId', currentProjectId)
+      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false })
     }
   }, []) // Only run on mount
 
@@ -270,6 +295,7 @@ export function AppShell({
   const effectiveProjectId = currentProjectId || projects[0]?.id
 
   return (
+    <SocketProvider projectId={effectiveProjectId}>
     <ProjectSettingsProvider key={effectiveProjectId} projectId={effectiveProjectId}>
       <RowHeightProvider>
         <div className="min-h-screen bg-background flex flex-col">
@@ -335,6 +361,7 @@ export function AppShell({
       </div>
       </RowHeightProvider>
     </ProjectSettingsProvider>
+    </SocketProvider>
   )
 }
 

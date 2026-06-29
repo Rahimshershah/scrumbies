@@ -84,9 +84,14 @@ export interface Comment {
   id: string
   content: string
   createdAt: string
+  updatedAt?: string
   author: User
   mentions: User[]
   taskStatusAtCreation?: TaskStatus | null // What phase the task was in when comment was made
+  resolved?: boolean
+  resolvedAt?: string | null
+  resolvedBy?: User | null
+  attachments?: Attachment[] // CommentAttachment records share the Attachment shape
 }
 
 export interface Attachment {

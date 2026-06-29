@@ -11,7 +11,11 @@ export async function GET(request: NextRequest) {
 
     const sprints = await prisma.sprint.findMany({
       where: projectId ? { projectId } : {},
-      orderBy: { order: 'asc' },
+      // Secondary sort by createdAt makes ordering deterministic even when
+      // multiple sprints share the same `order` value (e.g. legacy rows left
+      // at the default 0). Without this tiebreak Postgres returns ties in an
+      // arbitrary order, causing sprints to reshuffle on every reload.
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       include: {
         tasks: {
           orderBy: { order: 'asc' },

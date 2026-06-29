@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import { sendMentionNotification, sendCommentNotificationEmail } from '@/lib/email'
+import { emitToProject } from '@/lib/socket'
 
 // GET - Fetch all comments for a task
 export async function GET(
@@ -28,6 +29,17 @@ export async function GET(
             name: true,
           },
         },
+        attachments: {
+          include: {
+            uploadedBy: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        resolvedBy: {
+          select: { id: true, name: true, avatarUrl: true },
+        },
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -52,7 +64,7 @@ export async function POST(
     const { id: taskId } = await params
 
     const body = await request.json()
-    const { content, mentionIds } = body
+    const { content, mentionIds, attachmentIds } = body
 
     if (!content) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
@@ -60,11 +72,12 @@ export async function POST(
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { 
-        id: true, 
-        title: true, 
-        status: true, 
+      select: {
+        id: true,
+        title: true,
+        status: true,
         taskKey: true,
+        projectId: true,
         assigneeId: true,
         createdById: true,
         assignee: { select: { id: true, name: true, email: true } },
@@ -85,6 +98,11 @@ export async function POST(
         mentions: mentionIds?.length
           ? { connect: mentionIds.map((id: string) => ({ id })) }
           : undefined,
+        // Link any pre-uploaded comment attachments (backward compatible:
+        // omitting attachmentIds leaves behavior unchanged)
+        attachments: attachmentIds?.length
+          ? { connect: attachmentIds.map((id: string) => ({ id })) }
+          : undefined,
       },
       include: {
         author: {
@@ -99,6 +117,17 @@ export async function POST(
             id: true,
             name: true,
           },
+        },
+        attachments: {
+          include: {
+            uploadedBy: {
+              select: { id: true, name: true, avatarUrl: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        resolvedBy: {
+          select: { id: true, name: true, avatarUrl: true },
         },
       },
     })
@@ -174,6 +203,15 @@ export async function POST(
         taskTitle: task.title,
         commentContent: content,
         taskUrl,
+      })
+    }
+
+    // Broadcast the new comment to everyone viewing the project
+    if (task.projectId) {
+      emitToProject(task.projectId, 'comment:added', {
+        projectId: task.projectId,
+        taskId,
+        comment,
       })
     }
 

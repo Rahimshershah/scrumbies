@@ -14,11 +14,12 @@ import Gapcursor from '@tiptap/extension-gapcursor'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
 import Mention from '@tiptap/extension-mention'
+import Image from '@tiptap/extension-image'
 import { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
 import { cn, normalizeAvatarUrl } from '@/lib/utils'
 import { Button } from './button'
-import { useCallback, useEffect, useState, forwardRef, useImperativeHandle } from 'react'
+import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react'
 
 export interface MentionUser {
   id: string
@@ -36,6 +37,8 @@ interface RichTextEditorProps {
   minHeight?: string
   minimal?: boolean // When true, show collapsed state by default
   users?: MentionUser[] // Users available for mentions
+  enableImages?: boolean // Allow inline images via paste / drop / toolbar
+  onImageUpload?: (file: File) => Promise<string | null> // Upload an image file, resolve to its URL (or null on failure)
 }
 
 // Mention list component
@@ -111,7 +114,7 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(({ items, comma
   )
 })
 
-function MenuBar({ editor }: { editor: Editor | null }) {
+function MenuBar({ editor, onImageClick }: { editor: Editor | null; onImageClick?: () => void }) {
   if (!editor) return null
 
   const addTable = useCallback(() => {
@@ -259,6 +262,22 @@ function MenuBar({ editor }: { editor: Editor | null }) {
         </svg>
       </Button>
 
+      {/* Image insert (only when images are enabled) */}
+      {onImageClick && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2"
+          onClick={onImageClick}
+          title="Insert image"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </Button>
+      )}
+
       {/* Show table controls when cursor is in a table */}
       {isInTable && (
         <>
@@ -328,10 +347,30 @@ export function RichTextEditor({
   minHeight = '100px',
   minimal = false,
   users = [],
+  enableImages = false,
+  onImageUpload,
 }: RichTextEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
-  
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const editorRef = useRef<Editor | null>(null)
+  const onImageUploadRef = useRef(onImageUpload)
+  useEffect(() => { onImageUploadRef.current = onImageUpload }, [onImageUpload])
+
+  // Upload an image file then insert it at the cursor. Guards on the Image
+  // extension being present (enableImages) and on having an uploader.
+  const uploadAndInsertImage = useCallback(async (file: File) => {
+    const uploader = onImageUploadRef.current
+    const ed = editorRef.current
+    if (!uploader || !ed || !file.type.startsWith('image/')) return
+    try {
+      const url = await uploader(file)
+      if (url) ed.chain().focus().setImage({ src: url }).run()
+    } catch (err) {
+      console.error('Image upload failed:', err)
+    }
+  }, [])
+
   // Check if content has actual text (not just empty HTML)
   const hasContent = content && content !== '<p></p>' && content.replace(/<[^>]*>/g, '').trim().length > 0
 
@@ -439,6 +478,15 @@ export function RichTextEditor({
         },
         suggestion: users.length > 0 ? suggestion : undefined,
       }),
+      ...(enableImages
+        ? [
+            Image.configure({
+              inline: false,
+              allowBase64: false,
+              HTMLAttributes: { class: 'rounded-md max-w-full my-2 border' },
+            }),
+          ]
+        : []),
     ],
     content,
     editable,
@@ -486,8 +534,29 @@ export function RichTextEditor({
         ),
         style: `min-height: ${minimal && !isExpanded && !hasContent ? '40px' : minHeight}`,
       },
+      handlePaste: (_view, event) => {
+        if (!enableImages || !onImageUploadRef.current) return false
+        const files = event.clipboardData?.files
+        const images = files ? Array.from(files).filter((f) => f.type.startsWith('image/')) : []
+        if (images.length === 0) return false
+        event.preventDefault()
+        images.forEach((f) => uploadAndInsertImage(f))
+        return true
+      },
+      handleDrop: (_view, event) => {
+        if (!enableImages || !onImageUploadRef.current) return false
+        const files = (event as DragEvent).dataTransfer?.files
+        const images = files ? Array.from(files).filter((f) => f.type.startsWith('image/')) : []
+        if (images.length === 0) return false
+        event.preventDefault()
+        images.forEach((f) => uploadAndInsertImage(f))
+        return true
+      },
     },
   })
+
+  // Keep a ref to the editor so the stable paste/drop/upload callbacks can reach it.
+  useEffect(() => { editorRef.current = editor }, [editor])
 
   // Update content when it changes externally
   useEffect(() => {
@@ -520,7 +589,25 @@ export function RichTextEditor({
         }
       }}
     >
-      {showToolbar && <MenuBar editor={editor} />}
+      {showToolbar && (
+        <MenuBar
+          editor={editor}
+          onImageClick={enableImages && onImageUpload ? () => imageInputRef.current?.click() : undefined}
+        />
+      )}
+      {enableImages && (
+        <input
+          type="file"
+          accept="image/*"
+          ref={imageInputRef}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) uploadAndInsertImage(file)
+            e.target.value = ''
+          }}
+        />
+      )}
       <EditorContent editor={editor} />
     </div>
   )
@@ -563,6 +650,9 @@ export function RichTextDisplay({ content, className }: { content: string; class
         HTMLAttributes: {
           class: 'mention bg-primary/10 text-primary px-1 py-0.5 rounded font-medium',
         },
+      }),
+      Image.configure({
+        HTMLAttributes: { class: 'rounded-md max-w-full my-2 border' },
       }),
     ],
     content,

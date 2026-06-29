@@ -29,9 +29,9 @@ echo "=== Building application ==="
 npm run build
 
 echo ""
-echo "=== Restarting PM2 ==="
+echo "=== Restarting PM2 (runs server.js directly via ecosystem.config.js) ==="
 pm2 delete scrumbies 2>/dev/null || true
-pm2 start npm --name scrumbies -- start
+pm2 start ecosystem.config.js
 pm2 save
 
 echo ""

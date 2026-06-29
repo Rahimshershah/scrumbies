@@ -61,7 +61,7 @@ export default async function Home({ searchParams }: PageProps) {
     currentProjectId
       ? prisma.sprint.findMany({
           where: { projectId: currentProjectId },
-          orderBy: { order: 'asc' },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
           include: {
             tasks: {
               orderBy: { order: 'asc' },

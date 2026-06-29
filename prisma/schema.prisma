@@ -149,6 +149,8 @@ model User {
   attachments      Attachment[]
   notifications    Notification[]
   mentionedIn      Comment[]      @relation("Mentions")
+  resolvedComments Comment[]      @relation("ResolvedComments")
+  commentAttachments CommentAttachment[] @relation("CommentAttachments")
   activities       Activity[]
   projects         Project[]      @relation("ProjectMembers")
   createdProjects  Project[]      @relation("CreatedProjects")
@@ -277,9 +279,15 @@ model Comment {
   content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Context - what phase the task was in when comment was made
   taskStatusAtCreation TaskStatus?
+
+  // Resolution state
+  resolved     Boolean   @default(false)
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?     @relation("ResolvedComments", fields: [resolvedById], references: [id])
 
   // Relations
   task      Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -288,8 +296,26 @@ model Comment {
   authorId  String
   mentions  User[]         @relation("Mentions")
   notifications Notification[]
+  attachments CommentAttachment[]
 
   @@index([taskId])
+}
+
+model CommentAttachment {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  size      Int      // File size in bytes
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Relations
+  comment      Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  commentId    String
+  uploadedBy   User    @relation("CommentAttachments", fields: [uploadedById], references: [id])
+  uploadedById String
+
+  @@index([commentId])
 }
 
 model Attachment {

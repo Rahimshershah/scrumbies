@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
+import { emitToProject } from '@/lib/socket'
 
 export async function GET(
   request: NextRequest,
@@ -92,6 +93,14 @@ export async function PATCH(
         },
       },
     })
+
+    // Broadcast the updated sprint to everyone viewing the project
+    if (sprint.projectId) {
+      emitToProject(sprint.projectId, 'sprint:updated', {
+        projectId: sprint.projectId,
+        sprint,
+      })
+    }
 
     return NextResponse.json(sprint)
   } catch (error) {

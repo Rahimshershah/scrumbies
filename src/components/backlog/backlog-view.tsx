@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useRowHeight } from '@/contexts/row-height-context'
+import { useSocket } from '@/contexts/socket-context'
 import { TaskStatus, Priority } from '@/types'
 import {
   Dialog,
@@ -67,6 +68,7 @@ interface PendingMove {
 
 export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports, onViewChange, currentView = 'backlog' }: BacklogViewProps) {
   const { rowHeight, setRowHeight } = useRowHeight()
+  const { subscribe } = useSocket()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
   const [epics, setEpics] = useState<Epic[]>(initialEpics)
@@ -758,6 +760,64 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       sprint.id === updatedSprint.id ? { ...sprint, ...updatedSprint } : sprint
     ))
   }, [])
+
+  // ── Real-time: merge changes broadcast by other users in this project ──
+  // Uses functional state updaters only (no dependency on current sprints/backlog
+  // in closure) so the listeners stay correct without re-subscribing. selectedTask
+  // is only touched when it is the very task that changed, so a teammate's edit
+  // never hijacks or clobbers the task you have open.
+  useEffect(() => {
+    const upsertTask = (task: Task) => {
+      if (!task?.id) return
+      if (task.sprintId) {
+        setBacklogTasks(prev => prev.filter(t => t.id !== task.id))
+        setSprints(prev => prev.map(s => {
+          const without = s.tasks.filter(t => t.id !== task.id)
+          if (s.id === task.sprintId) {
+            const exists = s.tasks.some(t => t.id === task.id)
+            const tasks = exists
+              ? s.tasks.map(t => (t.id === task.id ? { ...t, ...task } : t))
+              : [...without, task].sort((a, b) => a.order - b.order)
+            return { ...s, tasks }
+          }
+          return { ...s, tasks: without }
+        }))
+      } else {
+        setSprints(prev => prev.map(s => ({ ...s, tasks: s.tasks.filter(t => t.id !== task.id) })))
+        setBacklogTasks(prev => {
+          const exists = prev.some(t => t.id === task.id)
+          return exists ? prev.map(t => (t.id === task.id ? { ...t, ...task } : t)) : [...prev, task]
+        })
+      }
+      // Keep an open sidebar fresh only if it's this exact task.
+      setSelectedTask(prev => (prev && prev.id === task.id ? { ...prev, ...task } : prev))
+    }
+
+    const removeTask = (taskId: string) => {
+      setSprints(prev => prev.map(s => ({ ...s, tasks: s.tasks.filter(t => t.id !== taskId) })))
+      setBacklogTasks(prev => prev.filter(t => t.id !== taskId))
+      setSelectedTask(prev => (prev && prev.id === taskId ? null : prev))
+    }
+
+    const unsubs = [
+      subscribe('task:created', (p) => p?.task && upsertTask(p.task as Task)),
+      subscribe('task:updated', (p) => p?.task && upsertTask(p.task as Task)),
+      subscribe('task:deleted', (p) => p?.taskId && removeTask(p.taskId as string)),
+      subscribe('sprint:updated', (p) => {
+        const sprint = p?.sprint as Sprint | undefined
+        if (!sprint?.id) return
+        // Merge metadata but preserve our locally-held task list unless the
+        // payload carries one (the sprint PATCH route does not include tasks).
+        setSprints(prev => prev.map(s => (s.id === sprint.id ? { ...s, ...sprint, tasks: sprint.tasks ?? s.tasks } : s)))
+      }),
+      subscribe('epic:updated', (p) => {
+        const epic = p?.epic as Epic | undefined
+        if (!epic?.id) return
+        setEpics(prev => prev.map(e => (e.id === epic.id ? { ...e, ...epic } : e)))
+      }),
+    ]
+    return () => unsubs.forEach(u => u())
+  }, [subscribe])
 
   // Check if dragging from active sprint
   const isFromActiveSprint = pendingMove?.sourceSprintStatus === 'ACTIVE'

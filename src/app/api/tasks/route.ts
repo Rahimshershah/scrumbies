@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
+import { emitToProject } from '@/lib/socket'
 
 export async function GET(request: NextRequest) {
   try {
@@ -164,6 +165,14 @@ export async function POST(request: NextRequest) {
         userId: user.id,
       },
     })
+
+    // Broadcast the new task to everyone viewing the project
+    if (task.projectId) {
+      emitToProject(task.projectId, 'task:created', {
+        projectId: task.projectId,
+        task,
+      })
+    }
 
     return NextResponse.json(task, { status: 201 })
   } catch (error) {
