@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Deployment scripts with credentials
 deploy.sh
+
+# user-uploaded files (persist on server, never in git)
+public/uploads/
