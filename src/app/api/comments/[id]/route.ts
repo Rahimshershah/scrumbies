@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-utils'
 import { emitToProject } from '@/lib/socket'
+import { sendEmail } from '@/lib/email'
 
 // Standard include shape returned by mutating handlers
 const commentInclude = {
@@ -35,7 +36,12 @@ export async function PATCH(
 
     const comment = await prisma.comment.findUnique({
       where: { id },
-      select: { authorId: true },
+      select: {
+        authorId: true,
+        content: true,
+        author: { select: { id: true, email: true, name: true } },
+        task: { select: { id: true, title: true, taskKey: true, projectId: true } },
+      },
     })
 
     if (!comment) {
@@ -85,16 +91,39 @@ export async function PATCH(
       include: commentInclude,
     })
 
-    // Derive the projectId via the comment's task, then broadcast the change
-    const relatedTask = await prisma.task.findUnique({
-      where: { id: updated.taskId },
-      select: { projectId: true },
-    })
-    if (relatedTask?.projectId) {
-      emitToProject(relatedTask.projectId, 'comment:updated', {
-        projectId: relatedTask.projectId,
+    // Broadcast the change to everyone viewing the project
+    if (comment.task?.projectId) {
+      emitToProject(comment.task.projectId, 'comment:updated', {
+        projectId: comment.task.projectId,
         taskId: updated.taskId,
         comment: updated,
+      })
+    }
+
+    // Email the comment's author when their comment is marked resolved
+    // (only on resolve, not unresolve; never email the person who resolved it).
+    if (resolved === true && comment.author && comment.author.id !== user.id && comment.author.email) {
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://scrumbies.hesab.com'
+      const taskUrl = `${baseUrl}/?task=${updated.taskId}`
+      const taskKey = comment.task?.taskKey || 'TASK'
+      const taskTitle = comment.task?.title || 'a task'
+      const snippet = (comment.content || '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200)
+      sendEmail({
+        to: comment.author.email,
+        toName: comment.author.name,
+        subject: `[${taskKey}] Your comment was marked resolved`,
+        html:
+          `<p>Hi ${comment.author.name},</p>` +
+          `<p><strong>${user.name}</strong> marked your comment on <strong>${taskTitle}</strong> (${taskKey}) as resolved.</p>` +
+          (snippet
+            ? `<blockquote style="border-left:3px solid #ddd;padding-left:10px;color:#555;">${snippet}</blockquote>`
+            : '') +
+          `<p><a href="${taskUrl}">View the task</a></p>`,
+        text: `${user.name} marked your comment on ${taskTitle} (${taskKey}) as resolved. ${taskUrl}`,
       })
     }
 
