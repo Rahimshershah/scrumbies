@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useRowHeight } from '@/contexts/row-height-context'
 import { useSocket } from '@/contexts/socket-context'
+import { useProjectSettings } from '@/contexts/project-settings-context'
 import { TaskStatus, Priority } from '@/types'
 import {
   Dialog,
@@ -69,6 +70,7 @@ interface PendingMove {
 export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports, onViewChange, currentView = 'backlog' }: BacklogViewProps) {
   const { rowHeight, setRowHeight } = useRowHeight()
   const { subscribe } = useSocket()
+  const { statuses } = useProjectSettings()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
   const [epics, setEpics] = useState<Epic[]>(initialEpics)
@@ -733,14 +735,22 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
   }, [])
 
   const handleCreateTask = useCallback((newTask: Task) => {
+    // Dedupe by id: the socket 'task:created' broadcast can also add this task
+    // to state (the creator is in the project room), so guard against a double insert.
     if (newTask.sprintId) {
       setSprints(prev => prev.map(sprint =>
         sprint.id === newTask.sprintId
-          ? { ...sprint, tasks: [...sprint.tasks, newTask] }
+          ? sprint.tasks.some(t => t.id === newTask.id)
+            ? { ...sprint, tasks: sprint.tasks.map(t => (t.id === newTask.id ? { ...t, ...newTask } : t)) }
+            : { ...sprint, tasks: [...sprint.tasks, newTask] }
           : sprint
       ))
     } else {
-      setBacklogTasks(prev => [...prev, newTask])
+      setBacklogTasks(prev =>
+        prev.some(t => t.id === newTask.id)
+          ? prev.map(t => (t.id === newTask.id ? { ...t, ...newTask } : t))
+          : [...prev, newTask]
+      )
     }
   }, [])
 
@@ -1165,12 +1175,9 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All Statuses</SelectItem>
-                    <SelectItem value="TODO">Todo</SelectItem>
-                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                    <SelectItem value="READY_TO_TEST">Ready to Test</SelectItem>
-                    <SelectItem value="BLOCKED">Blocked</SelectItem>
-                    <SelectItem value="DONE">Done</SelectItem>
-                    <SelectItem value="LIVE">Live</SelectItem>
+                    {statuses.map((s) => (
+                      <SelectItem key={s.key} value={s.key}>{s.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
