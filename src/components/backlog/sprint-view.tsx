@@ -502,7 +502,7 @@ export function SprintView({
       tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
     }))
     onTaskUpdate?.(updatedTask)
-    setSelectedTask(updatedTask)
+    setSelectedTask(prev => prev?.id === updatedTask.id ? updatedTask : prev)
   }, [onTaskUpdate])
 
   const handleTaskClick = useCallback((task: Task) => {
@@ -671,19 +671,22 @@ export function SprintView({
 
     if (tasksToMove.length === 0) return
 
-    const targetIndex = filteredTasks.findIndex(t => t.id === overId)
-    if (targetIndex === -1) return
-
     // Save original order for potential revert
     const originalTasks = [...localSprint.tasks]
     
     // Calculate new positions for all tasks being moved
     const tasksToMoveIds = new Set(tasksToMove.map(t => t.id))
-    const remainingTasks = filteredTasks.filter(t => !tasksToMoveIds.has(t.id))
+    const remainingTasks = sortedTasks.filter(t => !tasksToMoveIds.has(t.id))
+    const overIndex = remainingTasks.findIndex(t => t.id === overId)
+    if (overIndex === -1) return
+
+    const activeIndex = sortedTasks.findIndex(t => t.id === activeId)
+    const originalOverIndex = sortedTasks.findIndex(t => t.id === overId)
+    const insertIndex = activeIndex < originalOverIndex ? overIndex + 1 : overIndex
     const reorderedTasks = [
-      ...remainingTasks.slice(0, targetIndex),
+      ...remainingTasks.slice(0, insertIndex),
       ...tasksToMove,
-      ...remainingTasks.slice(targetIndex)
+      ...remainingTasks.slice(insertIndex)
     ]
     // Update order field values to match new array positions
     const newTasks = reorderedTasks.map((task, idx) => ({ ...task, order: idx }))
@@ -696,35 +699,25 @@ export function SprintView({
 
     // Persist the new order automatically
     try {
-      // Get the actual order value at the target position
-      const baseTargetOrder = filteredTasks[targetIndex]?.order ?? targetIndex
+      const response = await fetch('/api/tasks/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: activeId,
+          targetSprintId: localSprint.id,
+          newOrder: insertIndex,
+          orderedTaskIds: reorderedTasks.map(task => task.id),
+        }),
+      })
 
-      // Move all selected tasks sequentially to avoid race conditions
-      let lastResult = null
-      for (let idx = 0; idx < tasksToMove.length; idx++) {
-        const task = tasksToMove[idx]
-        const newOrder = baseTargetOrder + idx
-        const response = await fetch('/api/tasks/reorder', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId: task.id,
-            targetSprintId: localSprint.id,
-            newOrder: newOrder,
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to move task ${task.id}`)
-        }
-        lastResult = await response.json()
-      }
+      if (!response.ok) throw new Error('Failed to reorder tasks')
+      const result = await response.json()
 
       // Update with actual tasks from database to keep order values in sync
-      if (lastResult?.targetTasks) {
+      if (result.targetTasks) {
         setLocalSprint(prev => ({
           ...prev,
-          tasks: lastResult.targetTasks,
+          tasks: result.targetTasks,
         }))
       }
 

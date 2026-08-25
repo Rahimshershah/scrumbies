@@ -112,6 +112,15 @@ function Sidebar({
   className?: string
 }) {
   const isAdmin = currentUser?.role === 'ADMIN'
+  const sortedCompletedSprints = [...completedSprints].sort((a, b) => {
+    const orderDifference = b.order - a.order
+    if (orderDifference !== 0) return orderDifference
+
+    const aEnd = a.endDate ? new Date(a.endDate).getTime() : 0
+    const bEnd = b.endDate ? new Date(b.endDate).getTime() : 0
+    return bEnd - aEnd
+  })
+
   return (
     <TooltipProvider delayDuration={0}>
     <div className={cn("flex flex-col h-full bg-background border-r transition-all duration-200", className)}>
@@ -227,7 +236,7 @@ function Sidebar({
                 No completed sprints yet
               </p>
             ) : (
-              completedSprints.map((sprint) => {
+              sortedCompletedSprints.map((sprint) => {
                 const isSelected = selectedSprint?.id === sprint.id
                 const completedTasks = sprint.tasks.filter(t => t.status === 'DONE' || t.status === 'LIVE').length
                 const totalTasks = sprint.tasks.length

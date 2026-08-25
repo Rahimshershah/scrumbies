@@ -70,7 +70,7 @@ interface PendingMove {
 export function BacklogView({ initialSprints, initialBacklog, initialEpics = [], users, currentUser, projectId, onOpenDocument, taskToOpen, onNavigateToReports, onViewChange, currentView = 'backlog' }: BacklogViewProps) {
   const { rowHeight, setRowHeight } = useRowHeight()
   const { subscribe } = useSocket()
-  const { statuses } = useProjectSettings()
+  const { statuses, getStatusConfig } = useProjectSettings()
   const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
   const [backlogTasks, setBacklogTasks] = useState<Task[]>(initialBacklog)
   const [epics, setEpics] = useState<Epic[]>(initialEpics)
@@ -254,9 +254,33 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
 
   const filteredBacklogTasks = [...backlogTasks].sort((a, b) => a.order - b.order).filter(task => matchesFilters(task))
 
+  // Search is intentionally broader than the normal backlog view: it includes
+  // backlog items and every sprint, including completed sprint history.
+  const systemSearchResults = searchQuery.trim()
+    ? [
+        ...sprints.flatMap(sprint =>
+          sprint.tasks
+            .filter(task => matchesFilters(task))
+            .map(task => ({ task, sprint }))
+        ),
+        ...backlogTasks
+          .filter(task => matchesFilters(task))
+          .map(task => ({ task, sprint: null as Sprint | null })),
+      ].sort((a, b) => {
+        if (a.sprint === null && b.sprint !== null) return -1
+        if (a.sprint !== null && b.sprint === null) return 1
+        if (a.sprint && b.sprint && a.sprint.order !== b.sprint.order) {
+          return b.sprint.order - a.sprint.order
+        }
+        return a.task.order - b.task.order
+      })
+    : []
+
   // Calculate total tasks (for display)
   const totalTasks = visibleSprints.reduce((sum, s) => sum + s.tasks.length, 0) + backlogTasks.length
-  const filteredTotalTasks = filteredUATSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
+  const totalSystemTasks = sprints.reduce((sum, s) => sum + s.tasks.length, 0) + backlogTasks.length
+  const filteredTotalTasks = searchQuery.trim() ? systemSearchResults.length :
+                             filteredUATSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
                              filteredActiveSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
                              filteredPlannedSprints.reduce((sum, s) => sum + s.tasks.length, 0) +
                              filteredBacklogTasks.length
@@ -438,17 +462,13 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       }
 
       if (oldIndex !== newIndex) {
-        // Get the actual order value from the target position
-        const targetOrder = sortedTasks[newIndex]?.order ?? newIndex
-
         // Optimistic update for immediate visual feedback
+        const reorderedTasks = arrayMove(sortedTasks, oldIndex, newIndex)
+          .map((task, idx) => ({ ...task, order: idx }))
         setSprints((prev) => {
           const sprintIdx = prev.findIndex((s) => s.id === sprint.id)
-          const sprintSortedTasks = [...prev[sprintIdx].tasks].sort((a, b) => a.order - b.order)
-          const movedTasks = arrayMove(sprintSortedTasks, oldIndex, newIndex)
-          const newTasks = movedTasks.map((task, idx) => ({ ...task, order: idx }))
           const newSprints = [...prev]
-          newSprints[sprintIdx] = { ...newSprints[sprintIdx], tasks: newTasks }
+          newSprints[sprintIdx] = { ...newSprints[sprintIdx], tasks: reorderedTasks }
           return newSprints
         })
 
@@ -460,23 +480,27 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             body: JSON.stringify({
               taskId: activeId,
               targetSprintId: sprint.id,
-              newOrder: targetOrder,
+              newOrder: newIndex,
+              orderedTaskIds: reorderedTasks.map(task => task.id),
             }),
           })
 
-          if (response.ok) {
-            const result = await response.json()
-            // Update with actual tasks from database to keep order values in sync
-            if (result.targetTasks) {
-              setSprints((prev) => prev.map((s) =>
-                s.id === result.targetSprintId
-                  ? { ...s, tasks: result.targetTasks }
-                  : s
-              ))
-            }
+          if (!response.ok) throw new Error('Failed to reorder task')
+
+          const result = await response.json()
+          if (result.targetTasks) {
+            setSprints((prev) => prev.map((s) =>
+              s.id === result.targetSprintId
+                ? { ...s, tasks: result.targetTasks }
+                : s
+            ))
           }
         } catch (error) {
           console.error('Failed to reorder task:', error)
+          if (originalStateRef.current) {
+            setSprints(originalStateRef.current.sprints)
+            setBacklogTasks(originalStateRef.current.backlog)
+          }
         }
       }
     } else if (isInBacklog) {
@@ -490,15 +514,10 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
       }
 
       if (oldIndex !== newIndex) {
-        // Get the actual order value from the target position
-        const targetOrder = sortedBacklog[newIndex]?.order ?? newIndex
-
         // Optimistic update for immediate visual feedback
-        setBacklogTasks((prev) => {
-          const sortedPrev = [...prev].sort((a, b) => a.order - b.order)
-          const movedTasks = arrayMove(sortedPrev, oldIndex, newIndex)
-          return movedTasks.map((task, idx) => ({ ...task, order: idx }))
-        })
+        const reorderedTasks = arrayMove(sortedBacklog, oldIndex, newIndex)
+          .map((task, idx) => ({ ...task, order: idx }))
+        setBacklogTasks(reorderedTasks)
 
         // Persist to server and sync with actual DB values
         try {
@@ -508,19 +527,23 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             body: JSON.stringify({
               taskId: activeId,
               targetSprintId: null,
-              newOrder: targetOrder,
+              newOrder: newIndex,
+              orderedTaskIds: reorderedTasks.map(task => task.id),
             }),
           })
 
-          if (response.ok) {
-            const result = await response.json()
-            // Update with actual tasks from database to keep order values in sync
-            if (result.targetTasks) {
-              setBacklogTasks(result.targetTasks)
-            }
+          if (!response.ok) throw new Error('Failed to reorder task')
+
+          const result = await response.json()
+          if (result.targetTasks) {
+            setBacklogTasks(result.targetTasks)
           }
         } catch (error) {
           console.error('Failed to reorder task:', error)
+          if (originalStateRef.current) {
+            setSprints(originalStateRef.current.sprints)
+            setBacklogTasks(originalStateRef.current.backlog)
+          }
         }
       }
     }
@@ -533,7 +556,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
 
     // Persist to server
     try {
-      await fetch('/api/tasks/reorder', {
+      const response = await fetch('/api/tasks/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -542,6 +565,30 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
           newOrder: pendingMove.newOrder,
         }),
       })
+      if (!response.ok) throw new Error('Failed to move task')
+
+      const result = await response.json()
+      if (result.targetSprintId) {
+        setSprints(prev => prev.map(sprint =>
+          sprint.id === result.targetSprintId
+            ? { ...sprint, tasks: result.targetTasks }
+            : sprint.id === result.sourceSprintId && result.sourceTasks
+              ? { ...sprint, tasks: result.sourceTasks }
+              : sprint
+        ))
+        if (result.sourceSprintId === null && result.sourceTasks) {
+          setBacklogTasks(result.sourceTasks)
+        }
+      } else {
+        setBacklogTasks(result.targetTasks)
+        if (result.sourceSprintId && result.sourceTasks) {
+          setSprints(prev => prev.map(sprint =>
+            sprint.id === result.sourceSprintId
+              ? { ...sprint, tasks: result.sourceTasks }
+              : sprint
+          ))
+        }
+      }
     } catch (error) {
       console.error('Failed to move task:', error)
       // Revert on error
@@ -706,7 +753,9 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
         setBacklogTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t))
       }
     }
-    setSelectedTask(updatedTask)
+    // Inline table edits save in place. They should refresh a detail sheet only
+    // when that sheet was already opened explicitly by clicking the row.
+    setSelectedTask(prev => prev?.id === updatedTask.id ? updatedTask : prev)
   }, [sprints, backlogTasks])
 
   const handleTaskDelete = useCallback((taskId: string) => {
@@ -1043,8 +1092,8 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                 <p className="text-sm text-muted-foreground">
                   {(searchQuery.trim() || filterPriority !== 'ALL' || filterAssignee !== 'ALL' || filterStatus !== 'ALL') ? (
                     <>
-                      {filteredTotalTasks} of {totalTasks} tasks
-                      {filteredTotalTasks !== totalTasks && ' matching filters'}
+                      {filteredTotalTasks} of {searchQuery.trim() ? totalSystemTasks : totalTasks} tasks
+                      {filteredTotalTasks !== (searchQuery.trim() ? totalSystemTasks : totalTasks) && ' matching filters'}
                     </>
                   ) : (
                     <>
@@ -1114,7 +1163,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
                 <div className="relative flex-1 min-w-[200px] max-w-md">
                   <Input
                     type="text"
-                    placeholder="Search tasks by title, key, or tags..."
+                    placeholder="Search all sprints by title, key, or tags..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 pr-4"
@@ -1213,6 +1262,53 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
             </div>
           </div>
 
+          {searchQuery.trim() ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Search Results
+                </h2>
+                <Badge variant="secondary">{systemSearchResults.length}</Badge>
+              </div>
+              {systemSearchResults.length > 0 ? (
+                <div className="border rounded-lg divide-y overflow-hidden">
+                  {systemSearchResults.map(({ task, sprint }) => {
+                    const status = getStatusConfig(task.status)
+                    return (
+                      <button
+                        key={task.id}
+                        type="button"
+                        onClick={() => handleTaskClick(task)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/50 transition-colors"
+                      >
+                        <span className="text-xs font-mono text-muted-foreground w-20 flex-shrink-0">
+                          {task.taskKey || '—'}
+                        </span>
+                        <span className="text-sm font-medium flex-1 min-w-0 truncate">
+                          {task.title}
+                        </span>
+                        <Badge variant="outline" className="max-w-48 truncate flex-shrink-0">
+                          {sprint?.name || 'Backlog'}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="border-0 flex-shrink-0"
+                          style={{ backgroundColor: status.bgColor, color: status.color }}
+                        >
+                          {status.label}
+                        </Badge>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                  <p className="text-muted-foreground mb-2">No tasks found matching your filters</p>
+                  <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria</p>
+                </div>
+              )}
+            </div>
+          ) : (
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -1401,6 +1497,7 @@ export function BacklogView({ initialSprints, initialBacklog, initialEpics = [],
               )}
             </DragOverlay>
           </DndContext>
+          )}
         </div>
       </ScrollArea>
           )}

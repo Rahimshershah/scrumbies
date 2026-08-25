@@ -116,6 +116,7 @@ export async function PATCH(
         priority: true,
         team: true,
         taskKey: true,
+        projectId: true,
         sprintId: true,
         assigneeId: true,
         sprint: { select: { name: true } },
@@ -184,6 +185,19 @@ export async function PATCH(
     }
     if (sprintId !== undefined && sprintId !== currentTask.sprintId) {
       updateData.sprintId = sprintId
+      // A task moved through an inline table control belongs at the end of its
+      // new container. Reusing its old order creates duplicate positions and
+      // makes the next drag reorder appear unpredictable.
+      const lastTask = await prisma.task.findFirst({
+        where: {
+          sprintId,
+          projectId: currentTask.projectId,
+          id: { not: id },
+        },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      })
+      updateData.order = (lastTask?.order ?? -1) + 1
       const newSprint = sprintId
         ? await prisma.sprint.findUnique({ where: { id: sprintId }, select: { name: true } })
         : null
