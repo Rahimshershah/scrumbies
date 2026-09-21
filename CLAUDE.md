@@ -118,9 +118,10 @@ DATABASE_URL="postgresql://scrumbies:PASSWORD@localhost:5432/scrumbies?schema=pu
 NEXTAUTH_URL="https://scrumbies.hesab.com"
 NEXTAUTH_SECRET="generate-new-secret-with-openssl-rand-base64-32"
 
-# Email (Brevo)
-BREVO_API_KEY="your-brevo-api-key"
+# Email (Resend; Brevo key optional legacy fallback)
+RESEND_API_KEY="re_xxx"
 EMAIL_FROM="scrumbies@hesab.com"
+EMAIL_FROM_NAME="Scrumbies"
 ```
 
 ---
@@ -128,11 +129,12 @@ EMAIL_FROM="scrumbies@hesab.com"
 ## Architecture Notes
 
 ### Email Service
-- **Provider:** Brevo (formerly Sendinblue)
-- **Sender:** `scrumbies@hesab.com`
-- **Config:** `BREVO_API_KEY` and `EMAIL_FROM` in `.env`
-- **Implementation:** `src/lib/email.ts`
-- **Test Endpoint:** `POST /api/test-email` (admin only)
+- **Provider:** Resend (since Sep 2026, when hesab.com mail moved off Brevo). Brevo remains as a legacy fallback.
+- **Selection:** `RESEND_API_KEY` set → Resend; else `BREVO_API_KEY` → Brevo; else emails are skipped with a warning. `EMAIL_PROVIDER=resend|brevo` forces one.
+- **Sender:** `scrumbies@hesab.com` (`EMAIL_FROM`, `EMAIL_FROM_NAME`). The `hesab.com` domain must be verified in Resend for this sender to be accepted.
+- **Implementation:** `src/lib/email.ts` (`sendEmail` never throws; `sendEmailStrict` throws)
+- **Test Endpoint:** `GET /api/test-email` shows the active provider; `POST /api/test-email` `{"email": "..."}` (admin only) sends a test and returns the provider's real error on failure
+- **Gotcha:** `sendEmail` swallows provider errors by design, so a dead API key or an unverified sender shows up only in `pm2 logs scrumbies` (look for `Failed to send email via`).
 
 **Email Types:**
 - Task assignment notifications

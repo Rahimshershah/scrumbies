@@ -1,10 +1,25 @@
-// Brevo Email Service
-// Documentation: https://developers.brevo.com/docs/getting-started
+// Email Service
+// Providers: Resend (preferred, used when RESEND_API_KEY is set) or Brevo (legacy fallback).
+// Resend docs: https://resend.com/docs/api-reference/emails/send-email
+// Brevo docs:  https://developers.brevo.com/docs/getting-started
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
+const RESEND_API_URL = 'https://api.resend.com/emails'
 const BREVO_API_KEY = process.env.BREVO_API_KEY || ''
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 const FROM_EMAIL = process.env.EMAIL_FROM || 'scrumbies@hesab.com'
 const FROM_NAME = process.env.EMAIL_FROM_NAME || 'Scrumbies'
+
+export type EmailProvider = 'resend' | 'brevo' | 'none'
+
+// Resend wins when both keys are present (hesab.com moved from Brevo to Resend).
+export function getEmailProvider(): EmailProvider {
+  const forced = (process.env.EMAIL_PROVIDER || '').toLowerCase()
+  if (forced === 'resend' || forced === 'brevo') return forced
+  if (RESEND_API_KEY) return 'resend'
+  if (BREVO_API_KEY) return 'brevo'
+  return 'none'
+}
 
 interface SendEmailOptions {
   to: string
@@ -141,49 +156,83 @@ function emailButton(text: string, url: string, variant: 'primary' | 'secondary'
   `
 }
 
-// Send email using Brevo API
-export async function sendEmail({ to, subject, text, html, toName }: SendEmailOptions) {
-  if (!BREVO_API_KEY) {
-    console.warn('Brevo API key not configured, skipping email send')
+export interface SendEmailResult {
+  provider: EmailProvider
+  messageId?: string
+}
+
+async function sendViaResend({ to, subject, text, html, toName }: SendEmailOptions): Promise<SendEmailResult> {
+  const response = await fetch(RESEND_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: [toName ? `${toName} <${to}>` : to],
+      subject,
+      text,
+      html: html || text,
+    }),
+  })
+
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    console.error('Resend API error:', response.status, result)
+    throw new Error(`Resend error ${response.status}: ${result.message || result.name || response.statusText}`)
+  }
+  return { provider: 'resend', messageId: result.id }
+}
+
+async function sendViaBrevo({ to, subject, text, html, toName }: SendEmailOptions): Promise<SendEmailResult> {
+  const response = await fetch(BREVO_API_URL, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'api-key': BREVO_API_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: FROM_NAME, email: FROM_EMAIL },
+      to: [{ email: to, name: toName || to.split('@')[0] }],
+      subject,
+      textContent: text,
+      htmlContent: html || text,
+    }),
+  })
+
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    console.error('Brevo API error:', response.status, result)
+    throw new Error(`Brevo error ${response.status}: ${result.message || result.code || response.statusText}`)
+  }
+  return { provider: 'brevo', messageId: result.messageId }
+}
+
+// Throws on failure — callers that must not fail the request should use sendEmail().
+export async function sendEmailStrict(options: SendEmailOptions): Promise<SendEmailResult> {
+  const provider = getEmailProvider()
+  if (provider === 'resend') return sendViaResend(options)
+  if (provider === 'brevo') return sendViaBrevo(options)
+  throw new Error('No email provider configured (set RESEND_API_KEY or BREVO_API_KEY)')
+}
+
+// Send email via the configured provider. Never throws; logs and returns undefined on failure
+// so notification emails can't break the API request that triggered them.
+export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult | undefined> {
+  const provider = getEmailProvider()
+  if (provider === 'none') {
+    console.warn('No email provider configured (RESEND_API_KEY / BREVO_API_KEY), skipping email send')
     return
   }
 
   try {
-    const response = await fetch(BREVO_API_URL, {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'api-key': BREVO_API_KEY,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: {
-          name: FROM_NAME,
-          email: FROM_EMAIL,
-        },
-        to: [
-          {
-            email: to,
-            name: toName || to.split('@')[0],
-          },
-        ],
-        subject,
-        textContent: text,
-        htmlContent: html || text,
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      console.error('Brevo API error:', error)
-      throw new Error(`Failed to send email: ${error.message || response.statusText}`)
-    }
-
-    const result = await response.json()
-    console.log('Email sent successfully via Brevo:', result.messageId)
+    const result = await sendEmailStrict(options)
+    console.log(`Email sent successfully via ${result.provider}:`, result.messageId)
     return result
   } catch (error) {
-    console.error('Failed to send email via Brevo:', error)
+    console.error(`Failed to send email via ${provider} to ${options.to}:`, error)
   }
 }
 
