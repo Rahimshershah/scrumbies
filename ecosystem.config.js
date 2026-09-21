@@ -18,6 +18,11 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
+        // server.js binds to HOSTNAME when set. An interactive shell exports
+        // HOSTNAME=<machine name>, so `pm2 start` from a login session made the
+        // app listen on the machine's hostname instead of 127.0.0.1 and nginx
+        // returned 502s. Pin it so the bind address never depends on the shell.
+        HOSTNAME: '127.0.0.1',
         // Pin the uploads dir. Without this, getUploadsDir() in src/lib/utils.ts
         // sees this custom server.js and misfires into "standalone mode" → writes
         // to /var/www/uploads (root-owned, unwritable) and every upload 500s.
